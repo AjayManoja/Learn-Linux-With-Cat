@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SANDBOX_HOME="${GAME_ROOT:-.}/sandbox/home/catplayer"
+SANDBOX_HOME="${SANDBOX_HOME:-${GAME_ROOT:-.}/sandbox/home/catplayer}"
 TRASH_DIR="$SANDBOX_HOME/.cat_trash"
 
 init_safety() {

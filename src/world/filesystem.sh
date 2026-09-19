@@ -31,6 +31,41 @@ populate_stage_files() {
             echo "# catplayer's profile" > "${SANDBOX_HOME}/.profile"
             echo "# Login configuration goes here" >> "${SANDBOX_HOME}/.profile"
             ;;
+        2)
+            # Stage 2 is about searching rather than reading, so its files are
+            # deliberately too long to page through.
+            generate_system_log "${SANDBOX_HOME}/logs/system.log" 400
+            generate_system_log "${SANDBOX_HOME}/logs/archive.log" 250
+
+            inject_secret_line "${SANDBOX_HOME}/logs/system.log"                 "[2024-03-15 03:14:15] [ERROR] Intruder detected: dog at the cat flap"                 $(( (RANDOM % 200) + 100 ))
+            inject_secret_line "${SANDBOX_HOME}/logs/system.log"                 "[2024-03-15 03:14:16] [ERROR] Cat flap lock code: ${RANDOM}${RANDOM}"                 $(( (RANDOM % 80) + 300 ))
+            ;;
+        3)
+            # Stage 3 is about permissions, so the world ships deliberate modes.
+            mkdir -p "${SANDBOX_HOME}/work" "${SANDBOX_HOME}/vault"
+
+            cat > "${SANDBOX_HOME}/work/secrets.txt" <<'SECRETS'
+The humans think the vacuum cleaner is theirs.
+It is not. We are merely tolerating it.
+SECRETS
+
+            cat > "${SANDBOX_HOME}/work/greet.sh" <<'GREET'
+#!/usr/bin/env bash
+echo "Meow! This file can only run once you give it the execute bit."
+GREET
+
+            cat > "${SANDBOX_HOME}/work/backup.sh" <<'BACKUP'
+#!/usr/bin/env bash
+echo "Backing up all nap locations..."
+BACKUP
+
+            # Deliberately wrong to begin with; the lessons and missions fix them.
+            chmod 644 "${SANDBOX_HOME}/work/report.txt"  2>/dev/null || true
+            chmod 644 "${SANDBOX_HOME}/work/draft.txt"   2>/dev/null || true
+            chmod 666 "${SANDBOX_HOME}/work/secrets.txt" 2>/dev/null || true
+            chmod 644 "${SANDBOX_HOME}/work/greet.sh"    2>/dev/null || true
+            chmod 644 "${SANDBOX_HOME}/work/backup.sh"   2>/dev/null || true
+            ;;
         *)
             # Future stages can add their own population logic
             :

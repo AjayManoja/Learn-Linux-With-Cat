@@ -1,0 +1,7 @@
+Welcome to Stage 3, {{PLAYER}}.
+
+Every file in Linux answers three questions:
+  Who owns me? Who may read me? Who may change me?
+
+Up to now you have been allowed to do everything. That stops here.
+Some files in this stage will refuse you until you say otherwise.

@@ -439,8 +439,7 @@ run_stage() {
     # Load stage configuration
     load_stage "$stage_num"
 
-    # Initialize the sandbox working directory
-    SANDBOX_HOME="${GAME_ROOT}/sandbox/home/catplayer"
+    # sandbox.sh owns where the sandbox lives; just start the player in it.
     CURRENT_GAME_DIR="$SANDBOX_HOME"
     export SANDBOX_HOME CURRENT_GAME_DIR
 

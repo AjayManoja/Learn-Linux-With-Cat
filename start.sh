@@ -11,10 +11,12 @@ source "$GAME_ROOT/src/ui/box.sh"
 source "$GAME_ROOT/src/ui/banner.sh"
 source "$GAME_ROOT/src/engine/progress.sh"
 source "$GAME_ROOT/src/engine/hints.sh"
+# sandbox.sh first: it decides where the sandbox lives, and safety.sh and
+# checker.sh both resolve their paths against that.
+source "$GAME_ROOT/src/world/sandbox.sh"
 source "$GAME_ROOT/src/engine/safety.sh"
 source "$GAME_ROOT/src/engine/checker.sh"
 source "$GAME_ROOT/src/engine/runner.sh"
-source "$GAME_ROOT/src/world/sandbox.sh"
 source "$GAME_ROOT/src/world/maze.sh"
 source "$GAME_ROOT/src/world/filesystem.sh"
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CHECK_RESULT_MSG=""
-SANDBOX_HOME="${GAME_ROOT:-.}/sandbox/home/catplayer"
+SANDBOX_HOME="${SANDBOX_HOME:-${GAME_ROOT:-.}/sandbox/home/catplayer}"
 
 check_command_output() {
     local cmd="$1"
@@ -116,4 +116,38 @@ check_file_moved() {
 check_command_run() {
     local expected="$1"
     [[ "${LAST_COMMAND:-}" == "$expected" ]]
+}
+
+# Matches LAST_COMMAND against an extended regular expression. Lessons use this
+# where several spellings are equally correct ('head -5 f', 'head -n 5 f'), so
+# the check teaches the command rather than one exact keystroke sequence.
+check_command_matches() {
+    local pattern="$1"
+    [[ "${LAST_COMMAND:-}" =~ $pattern ]]
+}
+
+# True when the file holds at least one line matching the pattern. Missions use
+# it to verify the player captured the right search results into a file.
+check_file_matches() {
+    local filepath="${SANDBOX_HOME}/$1"
+    local pattern="$2"
+    [[ -f "$filepath" ]] && grep -qE "$pattern" "$filepath"
+}
+
+# Compares a file's permission bits against an octal mode like "644". Stage 3
+# checks the outcome rather than the command text, so any correct spelling of
+# chmod counts.
+check_file_mode() {
+    local filepath="${SANDBOX_HOME}/$1"
+    local expected="$2"
+    local actual
+    [[ -e "$filepath" ]] || return 1
+    actual="$(stat -c %a "$filepath" 2>/dev/null)" || return 1
+    [[ "$actual" == "$expected" ]]
+}
+
+# True when the file carries the executable bit for its owner.
+check_file_executable() {
+    local filepath="${SANDBOX_HOME}/$1"
+    [[ -x "$filepath" && -f "$filepath" ]]
 }

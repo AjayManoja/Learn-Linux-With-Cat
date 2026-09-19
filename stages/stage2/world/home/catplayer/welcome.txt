@@ -1,0 +1,6 @@
+Welcome back, {{PLAYER}}!
+
+Stage 1 taught you to walk around. Stage 2 teaches you to search.
+
+The files here are too big to read end to end. That is the point.
+You are going to learn to ask questions instead of reading answers.

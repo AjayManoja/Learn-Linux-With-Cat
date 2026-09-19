@@ -6,7 +6,13 @@
 
 ## 🎯 What Is This?
 
-**Learn Linux with Cat** is an interactive terminal game where a friendly cat character guides you through real Linux commands. Instead of reading tutorials, you learn by typing commands, exploring a virtual filesystem, and solving missions.
+**Learn Linux with Cat** is an interactive terminal game where a cat teaches you
+real Linux commands. Instead of reading tutorials, you type commands into a
+sandboxed filesystem and solve missions with them.
+
+Ten stages, from `pwd` to writing your own tools: **91 lessons, 30 missions and
+4 review checkpoints**. The commands are real, the filesystem is real, and
+nothing you type can reach anything outside the sandbox.
 
 ```
    /\_/\
@@ -37,11 +43,17 @@ docker run -it --rm catgame
 ## 🔁 How It Works
 
 ```
-Clone repo → ./start.sh → 🐱 Cat appears → Learn ONE command
-   → Practice it → Next command → 🧩 Hidden mission → 🏆 Stage Complete!
+./start.sh → 🐱 Learn ONE command → Practice it → Next command
+   → 🧩 Section mission → 🔁 Checkpoint → 🏆 Stage complete → next stage
 ```
 
-**Core rule:** Every command is taught, then used right away.
+**Two rules the whole game is built on:**
+
+1. Every command is taught, then used immediately.
+2. Nothing is taught once. Later stages need earlier commands, and the
+   checkpoints exist to make sure none of them have gone stale.
+
+Progress saves after every lesson, so `quit` and come back whenever.
 
 ---
 
@@ -94,30 +106,6 @@ asked:
 
 ---
 
-## 🧪 Running the Tests
-
-```bash
-bash tests/run_all.sh          # everything (exits non-zero on any failure)
-bash tests/test_lessons.sh     # no lesson can pass without doing the task
-bash tests/test_stages.sh      # every stage's content is present and loadable
-bash tests/test_safety.sh      # sandbox escape, command gates, rm, kill
-```
-
-Each test file builds a throwaway `GAME_ROOT`, so running the suite never
-touches your progress or your sandbox.
-
-Two invariants are worth knowing about, because breaking either one makes the
-game feel finished when it isn't:
-
-- **No lesson or mission may pass in a fresh world given an unrelated command.**
-  A check that returns success unconditionally prints "Well done!" for whatever
-  the player typed and moves on, which is indistinguishable from the game being
-  broken. `test_lessons.sh` enforces this for every lesson in every stage.
-- **Every mission must be winnable.** `test_missions.sh` asserts each one starts
-  incomplete and finishes via the steps its own briefing describes.
-
----
-
 ## 🐱 Dynamic Cat Poses
 
 The cat changes expression based on what's happening — 10 distinct poses:
@@ -149,9 +137,10 @@ Stuck? Type `hint` for three levels of help:
 
 ---
 
-## 🧩 The Hidden Cat Mission
+## 🧩 Missions
 
-After learning all commands, the cat sends you on a treasure hunt:
+Every section ends with a mission — no new commands, just a job that needs the
+ones you have. Stage 1 finishes with a treasure hunt:
 
 ```
 🐱 MISSION
@@ -165,15 +154,27 @@ Find it using only commands you've learned.
 - Find `fish.txt` with a secret code
 - Run `./check.sh <CODE>` to win!
 
+Each later stage ends the same way: identify an intruder from 400 log lines,
+open a vault you locked yourself out of, ship an archive with a checksum that
+proves it, write a tool that refuses bad input. Thirty missions in all.
+
 ---
 
 ## 🔄 Repetition System
 
-Commands aren't taught once and forgotten. Each new lesson requires using previous commands:
+Commands aren't taught once and forgotten. Three things keep them alive:
+
+**Within a stage** — each lesson needs the ones before it:
 
 ```
 pwd → ls + pwd → cd + pwd → cd + ls + pwd → cd + ls -la + cat → 🧩 Mission uses everything
 ```
+
+**Across stages** — later stages assume earlier ones. Stage 7 sorts `du` output
+with Stage 4's `sort`. Stage 10 wraps Stage 7's `find` in Stage 5's loops.
+
+**At the checkpoints** — questions that deliberately cannot be answered with the
+current stage alone. See [Review Checkpoints](#-review-checkpoints) above.
 
 > The player doesn't memorize commands — they get used to them.
 
@@ -185,8 +186,10 @@ pwd → ls + pwd → cd + pwd → cd + ls + pwd → cd + ls -la + cat → 🧩 M
 - 🚧 Every path argument must resolve inside the sandbox — absolute paths and
   `../` escapes are refused
 - 🔒 Only commands the current stage has unlocked will run
-- ⛓️ Command chaining (`;` `&&` `||`) and substitution (`` ` `` `$( )`) are
-  refused outside quotes, so they cannot route around the command gate
+- ⛓️ Command chaining (`;` `&&` `||`) and substitution (`$( )`) are refused
+  until Stage 9 teaches them — until then they are only a way around the
+  command gate. Once unlocked, every part of a chained command is still
+  checked against what you have been taught
 - ☠️ `kill` reaches only processes the game itself started — never your own
   shell or editor
 - ♻️ `rm` moves files to Cat's Trash Bin (`.cat_trash`) instead of deleting
@@ -201,7 +204,7 @@ pwd → ls + pwd → cd + pwd → cd + ls + pwd → cd + ls -la + cat → 🧩 M
 ## 🗂️ Project Structure
 
 ```
-learn-linux-with-cat/
+Learn-Linux-With-Cat/
 │
 ├── start.sh              🚀 Entry point
 ├── reset.sh              ♻️ Reset game
@@ -301,15 +304,16 @@ The engine discovers stages via `stages/*/stage.conf`. Stage numbering determine
 
 ## 💾 Progress
 
-Progress is saved to `.catgame_progress` after every lesson and mission. Quit
-with `quit` and the next session picks up at the next unfinished lesson rather
-than replaying the stage.
+Progress is saved to `.catgame_progress` after every lesson, mission and
+checkpoint challenge. Quit with `quit` and the next session picks up at the
+next unfinished item rather than replaying the stage.
 
 | Key | Meaning |
 |-----|---------|
 | `CURRENT_STAGE` | Stage you are on |
 | `COMPLETED_LESSONS` | Finished lessons, as `stage<N>:<id>` |
 | `COMPLETED_MISSIONS` | Finished missions |
+| `COMMANDS_PRACTICED` | Everything you have typed at least once (`help` shows it) |
 | `SANDBOX_STAGE` | Which stage's world the sandbox currently holds |
 
 `./reset.sh` clears progress and the sandbox and starts you over.
@@ -341,9 +345,52 @@ than replaying the stage.
 
 ---
 
+## 🧪 Running the Tests
+
+```bash
+bash tests/run_all.sh          # everything (exits non-zero on any failure)
+bash tests/test_lessons.sh     # no lesson passes without doing the task
+bash tests/test_missions.sh    # every mission is actually winnable
+bash tests/test_stages.sh      # every stage's content is present and loadable
+bash tests/test_safety.sh      # sandbox escape, command gates, rm, kill
+bash tests/test_checker.sh     # the task-verification library
+bash tests/test_engine.sh      # progress save, load and resume
+```
+
+Each test file builds a throwaway `GAME_ROOT`, so running the suite never
+touches your progress or your sandbox.
+
+Four invariants do most of the work here, because breaking any of them makes
+the game *feel* finished when it isn't:
+
+- **No lesson, mission or challenge may pass in a fresh world given an
+  unrelated command.** A check that returns success unconditionally prints
+  "Well done!" for whatever the player typed and moves on — indistinguishable
+  from the game being broken.
+- **Every mission must be winnable.** Each one is asserted to start incomplete
+  and to finish via the steps its own briefing describes.
+- **Every check must run without erroring.** A check that fails to parse
+  returns non-zero, which looks exactly like a check correctly rejecting a
+  wrong answer — so each one is called and its stderr inspected. `bash -n`
+  cannot catch this: an `=~` pattern is only parsed when the line executes.
+- **Every setup must survive running twice.** A player who quits partway
+  through a mission runs its setup again next session, and mission scripts
+  carry their own `set -e`, so a setup that cannot cope with the state it left
+  behind takes the whole session down.
+
+---
+
 ## 🤝 Contributing
 
-Want to add a new stage? See the architecture section above — each stage is a self-contained content package. Just add a new directory under `stages/` with the standard structure.
+Each stage is a self-contained content package — see
+[Adding New Stages](#-architecture-adding-new-stages). Add a directory under
+`stages/`, declare it in a `stage.conf`, and the engine picks it up. No engine
+changes required.
+
+Before opening a PR, run `bash tests/run_all.sh`. It will tell you if a lesson
+can be passed without doing the task, if a mission is unwinnable, if a check
+errors instead of rejecting, or if you have left a gap in the stage numbering
+that the game would stop at.
 
 ---
 

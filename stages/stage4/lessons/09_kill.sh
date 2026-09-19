@@ -26,5 +26,7 @@ HINT_2="'ps' lists PIDs. 'kill' takes one."
 HINT_3="Run 'ps', find the line saying sleep, and type: kill <that number>"
 
 check_task() {
-    check_no_background_running
+    # "nothing is running" is true for free in a fresh session, so the kill
+    # itself has to be typed as well.
+    check_command_matches '^kill( +-[0-9A-Za-z]+)? +[0-9]+$' && check_no_background_running
 }

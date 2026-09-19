@@ -23,6 +23,5 @@ HINT_2="Read system.log with less."
 HINT_3="Type 'less system.log' and press Enter."
 
 check_task() {
-    # auto-pass after running less on system.log
-    return 0
+    check_command_matches '^less +system\.log$'
 }

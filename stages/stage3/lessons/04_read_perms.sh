@@ -2,6 +2,8 @@
 # Lesson: reading the permission string
 
 LESSON_COMMAND="ls -l"
+# Where the player must be standing for these instructions to make sense.
+LESSON_START_DIR="work"
 LESSON_TITLE="CAT SAYS"
 LESSON_CAT_POSE="default"
 

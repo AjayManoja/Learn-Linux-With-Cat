@@ -432,9 +432,20 @@ run_lesson() {
     reset_hint_level
     unset -f check_task 2>/dev/null || true
     unset -f setup_lesson 2>/dev/null || true
+    LESSON_START_DIR=""
 
     # Source the lesson (defines variables + check_task function)
     source "$lesson_script"
+
+    # A lesson may require the player to be somewhere specific. Without this a
+    # lesson picks up wherever the last one — or the last mission — left them,
+    # which breaks its instructions and can make its check pass for free.
+    if [[ -n "${LESSON_START_DIR:-}" ]]; then
+        local start_dir="${SANDBOX_HOME}/${LESSON_START_DIR}"
+        if [[ -d "$start_dir" ]]; then
+            CURRENT_GAME_DIR="$start_dir"
+        fi
+    fi
 
     # Set hints from lesson variables
     set_hints "${HINT_1:-}" "${HINT_2:-}" "${HINT_3:-}"
@@ -514,6 +525,12 @@ run_mission() {
     # Enter free exploration mode
     interactive_prompt
 
+    # Missions send the player wandering. The next lesson expects to start at
+    # home, so put them back rather than leaving them wherever they finished.
+    CURRENT_GAME_DIR="$SANDBOX_HOME"
+
+    mark_mission_complete "$mission_id"
+
     # Mission complete!
     echo ""
     show_cat "${MISSION_SUCCESS_POSE:-celebrate}" "${MISSION_SUCCESS_MSG:-Mission Complete!}"
@@ -541,16 +558,21 @@ run_section() {
         return
     fi
 
-    # Iterate through lessons
+    # Iterate through lessons, skipping anything already finished. Without
+    # this a returning player replays the whole stage from lesson one.
     for lesson_id in $lessons_str; do
+        if lesson_is_complete "$lesson_id"; then
+            continue
+        fi
         CURRENT_LESSON="$lesson_id"
+        save_progress
         run_lesson "$lesson_id"
     done
 
     # Run section mission if defined
     local mission_var="SECTION_${section}_MISSION"
     local mission_id="${!mission_var:-}"
-    if [[ -n "$mission_id" ]]; then
+    if [[ -n "$mission_id" ]] && ! mission_is_complete "$mission_id"; then
         run_mission "$mission_id"
     fi
 
@@ -581,7 +603,7 @@ run_stage() {
     fi
 
     # Run the final mission if defined
-    if [[ -n "${FINAL_MISSION:-}" ]]; then
+    if [[ -n "${FINAL_MISSION:-}" ]] && ! mission_is_complete "$FINAL_MISSION"; then
         echo ""
         show_cat "mission" "One last challenge awaits..."
         echo ""

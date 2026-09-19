@@ -23,10 +23,5 @@ HINT_2="It's a two-letter command starting with l."
 HINT_3="Type 'ls' and press Enter."
 
 check_task() {
-    # The engine's checker passes if they ran ls
-    # Assuming standard behavior where check_task is called after successful execution of the command in the sandbox
-    if check_command_run "ls"; then
-        return 0
-    fi
-    return 0 # Auto-pass logic
+    check_command_matches '^ls$'
 }

@@ -14,6 +14,10 @@ export COMMANDS_PRACTICED=""
 export STAGE_1_COMPLETED=false
 # Which stage's world the sandbox currently holds; see prepare_stage_world.
 export SANDBOX_STAGE=""
+# Completed work, as "stage<N>:<id>" entries. Keyed by stage so a reset of one
+# stage cannot mark another's lessons done.
+export COMPLETED_LESSONS=""
+export COMPLETED_MISSIONS=""
 
 save_progress() {
     cat > "$PROGRESS_FILE" <<EOF
@@ -26,6 +30,8 @@ HINTS_USED="${HINTS_USED}"
 COMMANDS_PRACTICED="${COMMANDS_PRACTICED}"
 STAGE_1_COMPLETED="${STAGE_1_COMPLETED}"
 SANDBOX_STAGE="${SANDBOX_STAGE}"
+COMPLETED_LESSONS="${COMPLETED_LESSONS}"
+COMPLETED_MISSIONS="${COMPLETED_MISSIONS}"
 EOF
 }
 
@@ -40,9 +46,33 @@ load_progress() {
 
 mark_lesson_complete() {
     local lesson_id="$1"
-    # Logic to advance lesson could be here, for now just placeholder for tracking
+    local key="stage${CURRENT_STAGE}:${lesson_id}"
+
     CURRENT_LESSON="$lesson_id"
+    if [[ " $COMPLETED_LESSONS " != *" $key "* ]]; then
+        COMPLETED_LESSONS="${COMPLETED_LESSONS} $key"
+        COMPLETED_LESSONS="${COMPLETED_LESSONS# }"
+    fi
     save_progress
+}
+
+lesson_is_complete() {
+    [[ " $COMPLETED_LESSONS " == *" stage${CURRENT_STAGE}:${1} "* ]]
+}
+
+mark_mission_complete() {
+    local mission_id="$1"
+    local key="stage${CURRENT_STAGE}:${mission_id}"
+
+    if [[ " $COMPLETED_MISSIONS " != *" $key "* ]]; then
+        COMPLETED_MISSIONS="${COMPLETED_MISSIONS} $key"
+        COMPLETED_MISSIONS="${COMPLETED_MISSIONS# }"
+    fi
+    save_progress
+}
+
+mission_is_complete() {
+    [[ " $COMPLETED_MISSIONS " == *" stage${CURRENT_STAGE}:${1} "* ]]
 }
 
 mark_section_complete() {

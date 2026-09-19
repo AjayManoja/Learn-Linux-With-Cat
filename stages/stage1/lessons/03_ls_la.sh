@@ -24,6 +24,6 @@ HINT_2="Add the -l and -a flags."
 HINT_3="Type 'ls -la' and press Enter."
 
 check_task() {
-    # Auto-pass after running ls -la
-    return 0
+    # Both flags must be present, in either order or as separate arguments.
+    check_command_matches '^ls +-[al]+$' || check_command_matches '^ls +-[al] +-[al]$'
 }

@@ -23,8 +23,5 @@ HINT_2="Use cat on the text file."
 HINT_3="Type 'cat welcome.txt' and press Enter."
 
 check_task() {
-    if check_command_run "cat welcome.txt"; then
-        return 0
-    fi
-    return 0 # Or rely on engine check if implemented
+    check_command_matches '^cat +welcome\.txt$'
 }

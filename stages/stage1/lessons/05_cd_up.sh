@@ -2,6 +2,8 @@
 # Lesson: cd ..
 
 LESSON_COMMAND="cd .."
+# Where the player must be standing for these instructions to make sense.
+LESSON_START_DIR="Documents"
 LESSON_TITLE="CAT SAYS"
 LESSON_CAT_POSE="default"
 
@@ -23,9 +25,8 @@ HINT_2="Use the change directory command with two dots."
 HINT_3="Type 'cd ..' and press Enter."
 
 check_task() {
-    # Check if they went back up to the home directory
-    if check_current_dir "/home/catplayer"; then
-        return 0
-    fi
-    return 1
+    # Both halves matter: 'cd ..' must actually have been typed, and it must
+    # have landed at home. Checking only the location passed instantly for a
+    # player who was already standing there.
+    check_command_matches '^cd +\.\.$' && check_current_dir "/home/catplayer"
 }

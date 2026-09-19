@@ -23,8 +23,5 @@ HINT_2="It's cd followed by a tilde."
 HINT_3="Type 'cd ~' and press Enter."
 
 check_task() {
-    if check_current_dir "/home/catplayer"; then
-        return 0
-    fi
-    return 1
+    check_command_matches '^cd( +(~|--)?)?$' && check_current_dir "/home/catplayer"
 }

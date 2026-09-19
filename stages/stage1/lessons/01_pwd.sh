@@ -24,9 +24,6 @@ HINT_2="It's a navigation command for 'print working directory'."
 HINT_3="Type 'pwd' and press Enter."
 
 check_task() {
-    # Check if the player ran pwd and it shows /home/catplayer
-    if check_command_output "pwd" | grep -q "/home/catplayer"; then
-        return 0
-    fi
-    return 1
+    # Passed once the player runs pwd while standing in their home directory.
+    [[ "${LAST_COMMAND:-}" == "pwd" ]] && check_current_dir "/home/catplayer"
 }

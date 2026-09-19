@@ -6,7 +6,7 @@ SANDBOX_HOME="${GAME_ROOT:-.}/sandbox/home/catplayer"
 
 check_command_output() {
     local cmd="$1"
-    local expected="$2"
+    local expected="${2-}"
     local actual
     
     # Running securely in sandbox context is expected
@@ -88,7 +88,10 @@ check_file_copied() {
 
 check_current_dir() {
     local expected="$1"
-    if [[ "$CURRENT_GAME_DIR" == "$expected" || "$CURRENT_GAME_DIR" == "${SANDBOX_HOME}/${expected}" ]]; then
+    # Lessons express paths the way the player sees them (/home/catplayer/...),
+    # so translate that virtual root to the real sandbox path before comparing.
+    local want="${expected/#\/home\/catplayer/$SANDBOX_HOME}"
+    if [[ "$CURRENT_GAME_DIR" == "$want" || "$CURRENT_GAME_DIR" == "${SANDBOX_HOME}/${expected}" ]]; then
         CHECK_RESULT_MSG="Current directory is $expected."
         return 0
     else
@@ -108,4 +111,9 @@ check_file_moved() {
         CHECK_RESULT_MSG="Move failed: Source might still exist or destination missing."
         return 1
     fi
+}
+
+check_command_run() {
+    local expected="$1"
+    [[ "${LAST_COMMAND:-}" == "$expected" ]]
 }

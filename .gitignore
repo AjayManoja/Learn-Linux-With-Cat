@@ -1,0 +1,7 @@
+sandbox/
+.catgame_progress
+.mission_code
+*.swp
+*.swo
+*~
+.DS_Store

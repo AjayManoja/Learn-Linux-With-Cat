@@ -1,0 +1,11 @@
+Welcome, {{PLAYER}}!
+
+You have entered the world of Linux.
+A friendly cat will be your guide.
+
+Remember: every great journey begins
+with a single command.
+
+  /\_/\
+ ( o.o )  Let's go!
+  > ^ <

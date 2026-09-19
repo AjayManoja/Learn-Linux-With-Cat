@@ -1,0 +1,7 @@
+<html>
+  <head><title>Cat's Homepage</title></head>
+  <body>
+    <h1>Welcome to my scratching post!</h1>
+    <p>This website is currently under construction. Please check back after my nap.</p>
+  </body>
+</html>

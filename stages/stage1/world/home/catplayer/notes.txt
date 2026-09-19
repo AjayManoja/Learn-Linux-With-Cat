@@ -1,0 +1,5 @@
+This is the beginning of my great Linux adventure.
+I don't know much about terminals yet.
+But the cat seems to know what it is doing.
+Hopefully, there are no dogs in this system.
+I should remember to bring treats next time!

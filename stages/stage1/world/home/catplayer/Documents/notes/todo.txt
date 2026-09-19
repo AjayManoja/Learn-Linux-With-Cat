@@ -1,0 +1,5 @@
+[ ] Learn basic Linux commands
+[ ] Organize my home directory
+[ ] Find out where the cat hid my keys
+[ ] Buy more tuna
+[ ] Become a terminal wizard

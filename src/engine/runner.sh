@@ -17,6 +17,7 @@ load_stage() {
         export CURRENT_STAGE="$stage_num"
         unlock_commands "${STAGE_COMMANDS:-}"
         unlock_syntax "${STAGE_SYNTAX:-}"
+        unlock_system_paths "${STAGE_SYSTEM_PATHS:-}"
     else
         echo "Error: Stage $stage_num config not found at $conf_file"
         exit 1
@@ -49,6 +50,31 @@ command_unlocked() {
 # subject of the lesson.
 ALLOWED_SYNTAX="${ALLOWED_SYNTAX:-}"
 
+# Absolute paths outside the sandbox that a stage has unlocked for reading.
+# The OS stages are about inspecting the running system, and /proc is where
+# Linux keeps that information — a sandbox that refuses it cannot teach them.
+# These are read-only in practice: the player is unprivileged, rm still refuses
+# anything outside the sandbox, and the blocklist still applies.
+ALLOWED_SYSTEM_PATHS="${ALLOWED_SYSTEM_PATHS:-}"
+
+unlock_system_paths() {
+    local path
+    for path in $1; do
+        if [[ " $ALLOWED_SYSTEM_PATHS " != *" $path "* ]]; then
+            ALLOWED_SYSTEM_PATHS="${ALLOWED_SYSTEM_PATHS} $path"
+        fi
+    done
+    ALLOWED_SYSTEM_PATHS="${ALLOWED_SYSTEM_PATHS# }"
+}
+
+system_path_allowed() {
+    local candidate="$1" prefix
+    for prefix in $ALLOWED_SYSTEM_PATHS; do
+        [[ "$candidate" == "$prefix" || "$candidate" == "$prefix"/* ]] && return 0
+    done
+    return 1
+}
+
 unlock_syntax() {
     local feature
     for feature in $1; do
@@ -77,10 +103,18 @@ unlock_prior_commands() {
         unlock_commands "$line"
 
         line=$(grep -E '^STAGE_SYNTAX=' "$conf" | head -1) || true
-        [[ -n "$line" ]] || continue
-        line="${line#STAGE_SYNTAX=}"
-        line="${line//\"/}"
-        unlock_syntax "$line"
+        if [[ -n "$line" ]]; then
+            line="${line#STAGE_SYNTAX=}"
+            line="${line//\"/}"
+            unlock_syntax "$line"
+        fi
+
+        line=$(grep -E '^STAGE_SYSTEM_PATHS=' "$conf" | head -1) || true
+        if [[ -n "$line" ]]; then
+            line="${line#STAGE_SYSTEM_PATHS=}"
+            line="${line//\"/}"
+            unlock_system_paths "$line"
+        fi
     done
 }
 
@@ -188,7 +222,7 @@ sandbox_paths_ok() {
         case "$tok" in
             -*|'|'|'>'|'>>'|'<'|'&'|';') continue ;;
             "$SANDBOX_HOME"*) continue ;;
-            /*) return 1 ;;
+            /*) system_path_allowed "$tok" || return 1 ;;
             *..*)
                 resolved=$(realpath -m "${CURRENT_GAME_DIR}/${tok}" 2>/dev/null) || return 1
                 [[ "$resolved" == "$SANDBOX_HOME"* ]] || return 1
@@ -715,6 +749,112 @@ run_section() {
     mark_section_complete "$section"
 }
 
+# ── Interview Questions ────────────────────────────────────
+# The OS stages teach ideas, not keystrokes, and an idea you cannot put into
+# words is not learned. These are asked in plain English and answered in plain
+# English: the player types a sentence, not a command.
+#
+# Matching is deliberately generous — ANSWER_PATTERN looks for the words that
+# carry the meaning, because the point is recall, not phrasing. The model
+# answer is always shown afterwards, whether they got it or not, since these
+# double as revision.
+
+ask_question() {
+    local question_id="$1"
+    local question_script="${GAME_ROOT}/stages/stage${CURRENT_STAGE}/quiz/${question_id}.sh"
+
+    if [[ ! -f "$question_script" ]]; then
+        echo "Error: Question not found: $question_script"
+        return 1
+    fi
+
+    QUESTION=""
+    ANSWER_PATTERN=""
+    MODEL_ANSWER=""
+    QUESTION_HINT=""
+    source "$question_script"
+
+    echo ""
+    show_cat "thinking"
+    show_question_box "${QUESTION:-?}"
+    echo ""
+
+    local attempts=0
+    local answer=""
+    local answered=false
+
+    while [[ "$answered" == false ]]; do
+        echo -ne "${GREEN}your answer${RESET} (or 'hint', or 'answer' to reveal): "
+        if ! read -r answer; then
+            # Input ended (piped session); reveal and move on rather than spin.
+            break
+        fi
+
+        answer="${answer#"${answer%%[![:space:]]*}"}"
+        answer="${answer%"${answer##*[![:space:]]}"}"
+
+        [[ -z "$answer" ]] && continue
+
+        case "$answer" in
+            hint)
+                show_cat "hint" "${QUESTION_HINT:-Think about what the term actually describes.}"
+                continue
+                ;;
+            answer|skip|reveal)
+                break
+                ;;
+        esac
+
+        attempts=$((attempts + 1))
+
+        if [[ -n "$ANSWER_PATTERN" ]] && grep -qiE "$ANSWER_PATTERN" <<< "$answer"; then
+            answered=true
+            echo ""
+            show_cat "happy" "That's it."
+        elif [[ "$attempts" -ge 3 ]]; then
+            echo ""
+            show_cat "hint" "Close enough for now — here is how I'd put it."
+            break
+        else
+            show_cat "confused" "Not quite. Try again, or type 'answer' to see it."
+        fi
+    done
+
+    echo ""
+    show_answer_box "${MODEL_ANSWER:-}"
+    echo ""
+    read -r -p "Press Enter for the next question... "
+    echo ""
+
+    mark_lesson_complete "quiz:${question_id}"
+}
+
+run_quiz() {
+    local questions="${STAGE_QUIZ:-}"
+    [[ -n "$questions" ]] || return 0
+
+    local remaining="" question_id
+    for question_id in $questions; do
+        lesson_is_complete "quiz:${question_id}" || remaining="${remaining} ${question_id}"
+    done
+    [[ -n "$remaining" ]] || return 0
+
+    echo ""
+    show_section_banner "Q" "${STAGE_QUIZ_NAME:-Interview Questions}"
+    show_cat "mission" "${STAGE_QUIZ_INTRO:-These get asked in interviews. Answer in your own words — I am looking for the idea, not the wording.}"
+    echo ""
+    read -r -p "Press Enter to begin... "
+    echo ""
+
+    for question_id in $remaining; do
+        ask_question "$question_id"
+    done
+
+    echo ""
+    show_cat "celebrate" "${STAGE_QUIZ_OUTRO:-Good. You can explain it, which means you know it.}"
+    echo ""
+}
+
 # ── Review Checkpoints ─────────────────────────────────────
 # Every few stages the game stops teaching and asks the player to combine what
 # they learned here with what they learned earlier. Commands practised once and
@@ -824,8 +964,10 @@ run_stage() {
     fi
 
     # Consolidate before the finale: the review asks for earlier stages'
-    # commands alongside this one's.
+    # commands alongside this one's, and the questions ask whether the player
+    # can say out loud what the stage just showed them.
     run_review
+    run_quiz
 
     # Run the final mission if defined
     if [[ -n "${FINAL_MISSION:-}" ]] && ! mission_is_complete "$FINAL_MISSION"; then

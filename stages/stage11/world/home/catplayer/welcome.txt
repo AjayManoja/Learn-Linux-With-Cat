@@ -1,0 +1,12 @@
+Stage 11, {{PLAYER}}.
+
+Ten stages of commands. Now the question changes.
+
+Not "what do I type" but "what actually happened when I typed it".
+
+When you run ls, six things happen before a single filename appears.
+The shell forks. The copy replaces itself with the ls program. ls asks
+the kernel to open a directory. The kernel checks whether you are
+allowed. It reads the disk. The answer comes back.
+
+You are going to watch each of those steps for real.

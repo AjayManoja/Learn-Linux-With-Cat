@@ -49,3 +49,31 @@ show_info_box() {
   local message="${1:-}"
   echo -e "${BLUE}ℹ️  ${message}${RESET}"
 }
+
+# An interview-style question: asked in words, answered in words.
+show_question_box() {
+    local question="$1"
+    echo -e "${MAGENTA:-$CYAN}"
+    draw_dashed_line
+    echo -e "  ❓  QUESTION"
+    draw_dashed_line
+    echo -e "${RESET}${question}"
+    echo -e "${MAGENTA:-$CYAN}"
+    draw_dashed_line
+    echo -e "${RESET}"
+}
+
+# The model answer, shown whether or not the player got it — these double as
+# revision notes, so they are always worth reading.
+show_answer_box() {
+    local answer="$1"
+    [[ -n "$answer" ]] || return 0
+    echo -e "${GREEN}"
+    draw_dashed_line
+    echo -e "  💡  HOW I'D ANSWER IT"
+    draw_dashed_line
+    echo -e "${RESET}${answer}"
+    echo -e "${GREEN}"
+    draw_dashed_line
+    echo -e "${RESET}"
+}

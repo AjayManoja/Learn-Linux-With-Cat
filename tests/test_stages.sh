@@ -38,7 +38,7 @@ for stage_dir in "${stage_dirs[@]}"; do
         || fail "$stage_id: stage.conf has a syntax error"
 
     set +u
-    STAGE_NAME=""; STAGE_SECTIONS=""; STAGE_COMMANDS=""; FINAL_MISSION=""; STAGE_REVIEW=""
+    STAGE_NAME=""; STAGE_SECTIONS=""; STAGE_COMMANDS=""; FINAL_MISSION=""; STAGE_REVIEW=""; STAGE_QUIZ=""
     source "$conf"
     set -u
 
@@ -91,6 +91,28 @@ for stage_dir in "${stage_dirs[@]}"; do
         bash -n "$challenge_file" 2>/dev/null             && pass "$stage_id: review ${challenge}.sh parses"             || fail "$stage_id: review ${challenge}.sh has a syntax error"
         ( set +u; unset -f check_task; source "$challenge_file"
           [[ -n "${TASK_INSTRUCTION:-}" && -n "${HINT_3:-}" && -n "${RECALLS:-}" ]]             && type check_task >/dev/null 2>&1 )             && pass "$stage_id: review ${challenge}.sh is complete"             || fail "$stage_id: review ${challenge}.sh missing check_task, TASK_INSTRUCTION, HINT_3 or RECALLS"
+    done
+
+    # Interview questions: each must exist, parse, and carry a question, a
+    # matching pattern and a model answer.
+    for question in ${STAGE_QUIZ:-}; do
+        question_file="$stage_dir/quiz/${question}.sh"
+        if [[ ! -f "$question_file" ]]; then
+            fail "$stage_id: missing quiz question ${question}.sh"
+            continue
+        fi
+        bash -n "$question_file" 2>/dev/null             && pass "$stage_id: quiz ${question}.sh parses"             || fail "$stage_id: quiz ${question}.sh has a syntax error"
+        ( set +u; source "$question_file"
+          [[ -n "${QUESTION:-}" && -n "${ANSWER_PATTERN:-}" && -n "${MODEL_ANSWER:-}" ]] )             && pass "$stage_id: quiz ${question}.sh is complete"             || fail "$stage_id: quiz ${question}.sh missing QUESTION, ANSWER_PATTERN or MODEL_ANSWER"
+
+        # The pattern must be a usable regex, and must not accept anything at
+        # all — a pattern that matches nonsense makes the question pointless.
+        ( set +u; source "$question_file"
+          grep -qE "$ANSWER_PATTERN" <<< "probe" 2>/dev/null
+          [[ $? -le 1 ]] )             && pass "$stage_id: quiz ${question}.sh pattern is a valid regex"             || fail "$stage_id: quiz ${question}.sh pattern is not a valid regex"
+
+        ( set +u; source "$question_file"
+          ! grep -qiE "$ANSWER_PATTERN" <<< "zzz completely unrelated nonsense" 2>/dev/null )             && pass "$stage_id: quiz ${question}.sh rejects nonsense"             || fail "$stage_id: quiz ${question}.sh accepts any answer"
     done
 
     if [[ -n "$FINAL_MISSION" ]]; then

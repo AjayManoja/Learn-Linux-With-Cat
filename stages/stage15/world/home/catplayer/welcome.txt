@@ -1,0 +1,12 @@
+Stage 15, {{PLAYER}}.
+
+Every address your program uses is a lie.
+
+When your code reads address 0x7fff1234, that address does not exist on
+any memory chip. The kernel and the CPU translate it, page by page, to
+wherever the data actually lives - which might be RAM, might be disk, and
+might not exist yet at all.
+
+That translation is why processes cannot see each other's memory, why a
+program can use more memory than you have, and why a machine with free
+RAM can still grind to a halt.

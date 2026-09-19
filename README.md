@@ -10,9 +10,10 @@
 real Linux commands. Instead of reading tutorials, you type commands into a
 sandboxed filesystem and solve missions with them.
 
-Ten stages, from `pwd` to writing your own tools: **91 lessons, 30 missions and
-4 review checkpoints**. The commands are real, the filesystem is real, and
-nothing you type can reach anything outside the sandbox.
+Fifteen stages, from `pwd` to explaining why a machine with free RAM is still
+slow: **129 lessons, 45 missions, 24 checkpoint challenges and 25
+interview questions**. The commands are real, the filesystem is real, `/proc` is the
+actual kernel talking, and nothing you type can reach outside the sandbox.
 
 ```
    /\_/\
@@ -57,7 +58,7 @@ Progress saves after every lesson, so `quit` and come back whenever.
 
 ---
 
-## 🗺️ The Ten Stages
+## 🗺️ The Stages
 
 Each stage unlocks new commands and reuses everything before it. The sandbox is
 rebuilt from that stage's own world when you cross into it, and refuses any
@@ -76,10 +77,27 @@ command you have not been taught yet.
 | 9 | **The Shell Itself** | `env` `export` `PATH` `which` `$?` `&&` `\|\|` `;` `$( )` | Build a one-liner with substitution |
 | 10 | **The Toolkit** | `tee` `basename` `mktemp` `exit`, argument guards, `set -euo pipefail` | Write a real tool 🎓 |
 
-**The arc:** find your way around → search instead of reading → control who may
-do what → send output where you want it → write it down → reshape text → search
-by what things *are* → bundle and verify → understand the shell itself → build
-tools out of all of it.
+### Stages 11–15 — how Linux actually works
+
+The question changes from *what do I type* to *what is happening underneath*.
+These stages ship **runnable demos**: you do not read that a race condition
+loses updates, you run it and watch the counter come out wrong.
+
+| # | Stage | You learn | You watch it happen |
+|---|-------|-----------|---------------------|
+| 11 | **How Linux Is Built** | kernel vs shell, user vs kernel space, syscalls, `fork`/`exec`, `/proc` | one process become two, then become a different program |
+| 12 | **Processes, Properly** | PID/PPID, process states, orphans, signals, `SIGTERM` vs `SIGKILL`, zombies | a real zombie in state `Z`, and a PPID change to 1 on adoption |
+| 13 | **Threads and Races** | process vs thread, shared state, critical sections, mutexes, deadlock, starvation | increments vanish; a lock fixes it; two locks deadlock; a lock *order* fixes that |
+| 14 | **Who Gets the CPU** | load average, context switches, time slices, preemption, FCFS/SJF/round robin, `nice` | the same four jobs scheduled three ways, with the waiting times compared |
+| 15 | **Where Memory Goes** | virtual vs physical, pages, page faults, swap, page cache, the OOM killer | 256 MB reserved with no RAM used, then 65,536 page faults as it is touched |
+
+**The arc:** *use* Linux (1–10) → *understand* Linux (11–15).
+
+Find your way around → search instead of reading → control who may do what →
+send output where you want it → write it down → reshape text → search by what
+things *are* → bundle and verify → understand the shell → build tools. Then:
+see the layers → follow the processes → break things with concurrency → watch
+the scheduler choose → find where the memory went.
 
 ---
 
@@ -103,6 +121,30 @@ asked:
 ✅  Find the largest file in hoard/, then lock it to 600.
    Draws on: Stage 7 — du, sort · Stage 3 — chmod
 ```
+
+Checkpoints are at stages 3, 5, 7, 10 and 15.
+
+---
+
+## 🎓 Interview Questions
+
+Stages 11–15 teach ideas rather than keystrokes, and an idea you cannot put
+into words is not learned. Each of those stages ends with **five questions
+asked and answered in plain English** — you type a sentence, not a command:
+
+```
+❓  QUESTION
+What is the difference between a zombie process and an orphan process?
+
+your answer (or 'hint', or 'answer' to reveal): _
+```
+
+Matching is deliberately generous — it looks for the words that carry the
+meaning, not your phrasing. The model answer is shown either way, because
+these double as revision notes. Twenty-five questions in total, covering the
+ones that actually get asked: zombie vs orphan, SIGTERM vs SIGKILL, what a page
+fault is, why `free` showing no free memory is fine, the four conditions for
+deadlock, and what happens between typing `ls` and seeing output.
 
 ---
 
@@ -196,6 +238,9 @@ current stage alone. See [Review Checkpoints](#-review-checkpoints) above.
   them, so a mistake is recoverable
 - 🔓 Locking yourself out is not fatal: Stage 3 encourages you to `chmod`
   things, and the game reopens any directory it needs before staging a mission
+- 🔬 Stages 11–15 unlock **read access to `/proc`** so you can inspect the real
+  running system. It stays read-only in practice: you are unprivileged, `rm`
+  still refuses anything outside the sandbox, and the blocklist is unchanged
 - 🚫 Dangerous commands (`rm -rf /`, `sudo`, `wget`, etc.) are blocked
 - 🐳 Docker option for full isolation
 
@@ -245,16 +290,20 @@ Learn-Linux-With-Cat/
 │   └── sad.txt           😢 Errors
 │
 ├── stages/
-│   ├── stage1/  🐾 Welcome to Linux      stage6/  ✂️  Text Surgery
-│   ├── stage2/  🔍 Finding Things        stage7/  📏 Finding and Measuring
-│   ├── stage3/  🔐 Locks and Keys        stage8/  📦 Archives and Integrity
-│   ├── stage4/  🌊 Streams & Processes   stage9/  🐚 The Shell Itself
-│   └── stage5/  📜 Cat's First Script    stage10/ 🧰 The Toolkit
+│   ├── stage1/  🐾 Welcome to Linux      stage9/   🐚 The Shell Itself
+│   ├── stage2/  🔍 Finding Things        stage10/  🧰 The Toolkit
+│   ├── stage3/  🔐 Locks and Keys        stage11/  🏗️  How Linux Is Built
+│   ├── stage4/  🌊 Streams & Processes   stage12/  👪 Processes, Properly
+│   ├── stage5/  📜 Cat's First Script    stage13/  🧵 Threads and Races
+│   ├── stage6/  ✂️  Text Surgery          stage14/  ⏱️  Who Gets the CPU
+│   ├── stage7/  📏 Finding and Measuring stage15/  🧠 Where Memory Goes
+│   └── stage8/  📦 Archives and Integrity
 │       ├── stage.conf    📋 Metadata, lesson order, unlocked commands
 │       ├── lessons/      📚 Lesson scripts
 │       ├── missions/     🧩 Missions
-│       ├── review/       🔁 Checkpoint challenges (stages 3, 5, 7, 10)
-│       └── world/        🌍 Filesystem template
+│       ├── review/       🔁 Checkpoint challenges (3, 5, 7, 10, 15)
+│       ├── quiz/         🎓 Interview questions (11-15)
+│       └── world/        🌍 Filesystem template + runnable demos
 │
 └── tests/
     ├── run_all.sh        ▶️  Runs everything, exits non-zero on failure
@@ -293,6 +342,13 @@ command allowlist.
 `STAGE_REVIEW` names checkpoint challenges in `review/`. A challenge looks like
 a lesson without the teaching: `TASK_INSTRUCTION`, three hints, `check_task`,
 plus a `RECALLS` line naming the stages it spans.
+
+`STAGE_QUIZ` names interview questions in `quiz/`. Each defines a `QUESTION`,
+an `ANSWER_PATTERN` (a generous regex over the words that carry the meaning)
+and a `MODEL_ANSWER`.
+
+`STAGE_SYSTEM_PATHS` unlocks absolute paths outside the sandbox for reading —
+`/proc` for the OS stages. Without it every absolute path is refused.
 
 `run_game` walks `stages/stage*/stage.conf` in numeric order and stops at the
 first gap, so stages must be numbered contiguously. `tests/test_stages.sh`
@@ -334,8 +390,10 @@ next unfinished item rather than replaying the stage.
 ## 🧰 Requirements
 
 - **Bash 4+** (Linux, macOS with Homebrew bash, WSL on Windows)
-- No external dependencies
-- Or just **Docker**
+- **python3** for the Stage 11–15 demos (no compiler needed — they are all
+  Python, so there is nothing to build)
+- `procps` and `psmisc` for `ps` and `pstree`
+- Or just **Docker**, which has all of it
 
 > **On Windows:** run it under WSL or Docker, not Git Bash. Stage 3 teaches
 > permissions, and Windows mounts ignore `chmod` — a file on `/mnt/c` stays

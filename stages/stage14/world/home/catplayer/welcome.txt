@@ -1,0 +1,12 @@
+Stage 14, {{PLAYER}}.
+
+Your machine has a handful of cores and hundreds of processes. They are
+not all running. Most are asleep, and the few that want the CPU take
+turns so fast it looks simultaneous.
+
+The scheduler decides the order. Which order it picks changes how long
+each job waits - and the same set of jobs can finish in wildly different
+average times depending only on that choice.
+
+The simulator here lets you try each algorithm on the same jobs and
+compare the numbers.

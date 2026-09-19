@@ -1,0 +1,11 @@
+Stage 13, {{PLAYER}}.
+
+Everything so far happened one thing at a time. Real systems do not.
+
+When two threads share a variable, the obvious code is wrong - and it is
+wrong intermittently, which is far worse than being wrong always. It will
+pass your tests and fail in production.
+
+There are four demos here. Run them. Concurrency is the one topic where
+reading the explanation genuinely does not work; you need to watch a
+counter come out wrong.

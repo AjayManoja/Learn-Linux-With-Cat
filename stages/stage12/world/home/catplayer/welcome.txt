@@ -1,0 +1,11 @@
+Stage 12, {{PLAYER}}.
+
+Stage 4 taught you that ps lists processes and kill stops them. That was
+the tourist version.
+
+Every process has a parent. Every process is in a state. Every kill sends
+a specific signal, and the process usually gets to decide what to do
+about it - except for one signal, which it cannot refuse.
+
+By the end of this stage you will make a zombie on purpose, and know
+exactly whose fault it is.

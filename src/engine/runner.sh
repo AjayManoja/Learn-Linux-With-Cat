@@ -62,12 +62,62 @@ unlock_prior_commands() {
 # Shell syntax the sandbox refuses outright. Pipes, redirection and background
 # jobs are the point of later stages, but chaining and command substitution are
 # escape hatches around the command allowlist.
+# Quoting decides whether a metacharacter is an escape hatch or just text.
+# Stage 5 has the player write shell code into files:
+#   echo 'if [ -f data.txt ]; then' >> check.sh
+# That semicolon is inside quotes and chains nothing, so only unquoted
+# occurrences are refused.
 sandbox_syntax_ok() {
     local line="$1"
-    case "$line" in
-        *';'*|*'&&'*|*'||'*|*'`'*|*'$('*|*'>('*|*'<('*) return 1 ;;
-    esac
+    local i ch quote="" prev=""
+
+    for (( i = 0; i < ${#line}; i++ )); do
+        ch="${line:i:1}"
+
+        if [[ -n "$quote" ]]; then
+            [[ "$ch" == "$quote" ]] && quote=""
+            prev="$ch"
+            continue
+        fi
+
+        case "$ch" in
+            "'"|'"') quote="$ch" ;;
+            ';'|'`')  return 1 ;;
+            '&') [[ "$prev" == '&' ]] && return 1 ;;   # && chains; a lone & backgrounds
+            '|') [[ "$prev" == '|' ]] && return 1 ;;   # || chains; a lone | pipes
+            '(') [[ "$prev" == '$' || "$prev" == '>' || "$prev" == '<' ]] && return 1 ;;
+        esac
+
+        prev="$ch"
+    done
+
     return 0
+}
+
+# Splits on unquoted pipes only, one segment per line.
+split_unquoted_pipes() {
+    local line="$1"
+    local i ch quote="" segment=""
+
+    for (( i = 0; i < ${#line}; i++ )); do
+        ch="${line:i:1}"
+
+        if [[ -n "$quote" ]]; then
+            [[ "$ch" == "$quote" ]] && quote=""
+            segment+="$ch"
+            continue
+        fi
+
+        case "$ch" in
+            "'"|'"') quote="$ch"; segment+="$ch" ;;
+            '|') printf '%s
+' "$segment"; segment="" ;;
+            *) segment+="$ch" ;;
+        esac
+    done
+
+    printf '%s
+' "$segment"
 }
 
 # Rewrite the path the player sees onto the real sandbox directory.
@@ -96,16 +146,49 @@ sandbox_paths_ok() {
 # Each stage of a pipeline has to start with a command the player has learned.
 pipeline_commands_ok() {
     local line="$1" segment first
-    local IFS='|'
-    for segment in $line; do
+    while IFS= read -r segment; do
         first=$(echo "$segment" | awk '{print $1}')
         [[ -n "$first" ]] || continue
+        # A variable assignment prefix ('NAME=value cmd') is not a command.
+        [[ "$first" == *=* ]] && continue
         if ! command_unlocked "$first"; then
             UNKNOWN_COMMAND="$first"
             return 1
         fi
-    done
+    done < <(split_unquoted_pipes "$line")
     return 0
+}
+
+# ── Background Jobs ────────────────────────────────────────
+# Stage 4 teaches 'kill', which means the player types a PID. Only processes
+# this game started may be targeted: a bare `kill 1234` would otherwise reach
+# anything their account owns, including their own editor or shell.
+
+game_pid_file() {
+    echo "${SANDBOX_ROOT}/.game_pids"
+}
+
+record_game_pid() {
+    echo "$1" >> "$(game_pid_file)"
+}
+
+# True only for a PID this game launched and that is still alive.
+pid_is_ours() {
+    local pid="$1" file
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+    file="$(game_pid_file)"
+    [[ -f "$file" ]] || return 1
+    grep -qx "$pid" "$file"
+}
+
+list_game_pids() {
+    local file pid
+    file="$(game_pid_file)"
+    [[ -f "$file" ]] || return 0
+    while read -r pid; do
+        [[ -n "$pid" ]] || continue
+        kill -0 "$pid" 2>/dev/null && echo "$pid"
+    done < "$file"
 }
 
 execute_in_sandbox() {
@@ -205,6 +288,35 @@ execute_in_sandbox() {
         return 0
     fi
 
+    # `kill` is gated to this game's own background jobs.
+    if [[ "$cmd" == "kill" ]]; then
+        local tok found_pid=false
+        for tok in $args; do
+            [[ "$tok" =~ ^-  ]] && continue
+            found_pid=true
+            if ! pid_is_ours "$tok"; then
+                show_cat "warning" "PID ${tok} isn't one of ours — I only let you stop jobs this game started."
+                return 0
+            fi
+        done
+        if [[ "$found_pid" == false ]]; then
+            echo "kill: usage: kill <pid>"
+            return 0
+        fi
+    fi
+
+    # A trailing '&' runs the command in the background. It is launched from
+    # here rather than inside a throwaway subshell so its PID can be recorded
+    # and, later, verified by the kill gate above.
+    if [[ "$mapped" =~ \&[[:space:]]*$ ]]; then
+        local bg_cmd="${mapped%&}"
+        ( cd "$CURRENT_GAME_DIR" && eval "$bg_cmd" ) >/dev/null 2>&1 &
+        local bg_pid=$!
+        record_game_pid "$bg_pid"
+        echo "[background] started with PID ${bg_pid}"
+        return 0
+    fi
+
     ( cd "$CURRENT_GAME_DIR" && eval "$mapped" ) 2>&1 || true
     return 0
 }
@@ -230,8 +342,13 @@ interactive_prompt() {
 
         local input=""
         if read -t 60 -r input; then
-            # Trim whitespace
-            input=$(echo "$input" | xargs 2>/dev/null || echo "$input")
+            # Trim surrounding whitespace. This used to go through xargs,
+            # which also strips quotes and re-splits words: typing
+            #   echo '#!/usr/bin/env bash' > script.sh
+            # arrived as an unquoted '#!...' and the shell read the rest of
+            # the line as a comment, so the command silently did nothing.
+            input="${input#"${input%%[![:space:]]*}"}"
+            input="${input%"${input##*[![:space:]]}"}"
 
             if [[ -z "$input" ]]; then
                 continue
@@ -280,9 +397,13 @@ interactive_prompt() {
                     if type check_task &>/dev/null; then
                         if check_task; then
                             task_complete=true
-                            echo ""
-                            show_cat "${TASK_SUCCESS_POSE:-happy}" "${TASK_SUCCESS_MSG:-Well done!}"
-                            echo ""
+                            # Missions clear this and announce their own
+                            # message once the prompt returns.
+                            if [[ -n "${TASK_SUCCESS_MSG:-}" ]]; then
+                                echo ""
+                                show_cat "${TASK_SUCCESS_POSE:-happy}" "$TASK_SUCCESS_MSG"
+                                echo ""
+                            fi
                         fi
                     fi
                     ;;
@@ -384,6 +505,11 @@ run_mission() {
     if type check_mission &>/dev/null; then
         check_task() { check_mission; }
     fi
+
+    # Otherwise the last lesson's success line fires when the mission passes,
+    # just before the mission announces its own.
+    TASK_SUCCESS_MSG=""
+    TASK_SUCCESS_POSE=""
 
     # Enter free exploration mode
     interactive_prompt

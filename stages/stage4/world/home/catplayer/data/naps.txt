@@ -1,0 +1,10 @@
+windowsill
+bookshelf
+laundry
+windowsill
+box
+laundry
+windowsill
+radiator
+box
+windowsill

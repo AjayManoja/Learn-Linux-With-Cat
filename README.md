@@ -45,21 +45,38 @@ Clone repo → ./start.sh → 🐱 Cat appears → Learn ONE command
 
 ---
 
-## 🗺️ Stage 1: Welcome to Linux
+## 🗺️ The Five Stages
 
-Stage 1 teaches filesystem navigation and basic file manipulation through three sections:
+Each stage unlocks new commands and reuses everything before it. The sandbox is
+rebuilt from that stage's own world when you cross into it.
 
-| Section | Focus | Commands | Mission |
-|---------|-------|----------|---------|
-| 🅰️ Navigate | Where am I? | `pwd` `ls` `ls -la` `cd` `cd ..` `cd ~` | Find the lost note |
-| 🅱️ Files | Read, create, change | `cat` `less` `mkdir` `touch` `cp` `mv` `rm` | Organize cat's files |
-| 🔐 Final | Put it all together | All of the above | Find the missing fish! 🐟 |
+| # | Stage | You learn | Final mission |
+|---|-------|-----------|---------------|
+| 1 | **Welcome to Linux** | `pwd` `ls` `ls -la` `cd` `cat` `less` `mkdir` `touch` `cp` `mv` `rm` | Find the hidden fish toy 🐟 |
+| 2 | **Finding Things** | `head` `tail` `wc` `grep` (`-i` `-n` `-r`) `find -name` and the pipe `\|` | Identify an intruder from 400 log lines |
+| 3 | **Locks and Keys** | `ls -l` `whoami` `id` `stat` `chmod` (numeric + symbolic) `chown` | Open a vault locked at `000` |
+| 4 | **Streams and Processes** | `echo` `>` `>>` `sort` `uniq` `ps` `&` `kill` | Build a report with a header and a tally |
+| 5 | **Cat's First Script** | `#!` shebang, `chmod +x`, variables, `$1`, `if`, `for` | Write a script that uses all of it 🎓 |
 
-**Mental model you build:**
+**The arc:** find your way around → search instead of reading → control who may do
+what → send output where you want it → stop typing commands and write them down.
 
+Stage 3 is where the game stops being read-only: a file set to `000` genuinely
+refuses you until you change it. Stage 4 starts real background processes that
+you find with `ps` and stop with `kill`. Stage 5 has you write, chmod and run
+actual scripts.
+
+---
+
+## 🧪 Running the Tests
+
+```bash
+bash tests/run_all.sh          # everything
+bash tests/test_stages.sh      # every stage's content is present and loadable
 ```
-Where am I? → What's here? → Move → Read → Create → Copy → Rename → Delete
-```
+
+The suite exits non-zero if any assertion fails, and never touches your real
+progress or sandbox.
 
 ---
 
@@ -127,8 +144,15 @@ pwd → ls + pwd → cd + pwd → cd + ls + pwd → cd + ls -la + cat → 🧩 M
 ## 🛡️ Safety
 
 - 🧱 Everything runs in a sandbox directory (never touches your real system)
+- 🚧 Every path argument must resolve inside the sandbox — absolute paths and
+  `../` escapes are refused
+- 🔒 Only commands the current stage has unlocked will run
+- ⛓️ Command chaining (`;` `&&` `||`) and substitution (`` ` `` `$( )`) are
+  refused outside quotes, so they cannot route around the command gate
+- ☠️ `kill` reaches only processes the game itself started — never your own
+  shell or editor
 - ♻️ Stage 1: deleted files go to Cat's Trash Bin (recoverable)
-- 🚫 Dangerous commands (`rm -rf /`, `sudo`, etc.) are blocked
+- 🚫 Dangerous commands (`rm -rf /`, `sudo`, `wget`, etc.) are blocked
 - 🐳 Docker option for full isolation
 
 ---
@@ -177,13 +201,25 @@ learn-linux-with-cat/
 │   └── sad.txt           😢 Errors
 │
 ├── stages/
-│   └── stage1/
-│       ├── stage.conf    📋 Stage metadata + lesson order
-│       ├── lessons/      📚 13 lesson scripts (01_pwd → 13_rm)
-│       ├── missions/     🧩 3 missions (nav, file, hidden cat)
+│   ├── stage1/           🐾 Welcome to Linux
+│   ├── stage2/           🔍 Finding Things
+│   ├── stage3/           🔐 Locks and Keys
+│   ├── stage4/           🌊 Streams and Processes
+│   └── stage5/           📜 Cat's First Script
+│       ├── stage.conf    📋 Metadata, lesson order, unlocked commands
+│       ├── lessons/      📚 Lesson scripts
+│       ├── missions/     🧩 Missions
 │       └── world/        🌍 Filesystem template
 │
-└── tests/                🧪 Engine, safety, checker, integration tests
+└── tests/
+    ├── run_all.sh        ▶️  Runs everything, exits non-zero on failure
+    ├── helpers.sh        🧰 Assertions + isolated GAME_ROOT
+    ├── test_engine.sh    💾 Progress save/load
+    ├── test_checker.sh   ✅ Task verification library
+    ├── test_safety.sh    🛡️ Command gates, sandbox escape, kill gate
+    ├── test_missions.sh  🧩 Every mission is actually winnable
+    ├── test_stage1.sh    🌍 Sandbox build + world population
+    └── test_stages.sh    📋 Every stage loads and is complete
 ```
 
 ---
@@ -193,13 +229,21 @@ learn-linux-with-cat/
 The engine is **fully data-driven**. Adding Stage 2 requires **zero engine modifications**:
 
 ```
-stages/stage2/
-├── stage.conf           ← Define sections, lessons, missions
-├── lessons/*.sh         ← Lesson scripts (same format as Stage 1)
+stages/stage6/
+├── stage.conf           ← Sections, lessons, missions, STAGE_COMMANDS
+├── lessons/*.sh         ← Lesson scripts (same format as every other stage)
 ├── missions/*.sh        ← Mission scripts
 └── world/               ← New filesystem template
     └── home/catplayer/
 ```
+
+`STAGE_COMMANDS` lists what that stage unlocks. The sandbox refuses anything
+the player has not been taught yet, so a command missing from this list will
+be rejected even if the lesson teaches it.
+
+`run_game` walks `stages/stage*/stage.conf` in numeric order and stops at the
+first gap, so stages must be numbered contiguously. `tests/test_stages.sh`
+checks that for you.
 
 The engine discovers stages via `stages/*/stage.conf`. Stage numbering determines order. Progress tracking handles transitions automatically.
 
@@ -221,6 +265,12 @@ The engine discovers stages via `stages/*/stage.conf`. Stage numbering determine
 - **Bash 4+** (Linux, macOS with Homebrew bash, WSL on Windows)
 - No external dependencies
 - Or just **Docker**
+
+> **On Windows:** run it under WSL or Docker, not Git Bash. Stage 3 teaches
+> permissions, and Windows mounts ignore `chmod` — a file on `/mnt/c` stays
+> `777` whatever you set. The game detects this and relocates its sandbox to a
+> native filesystem automatically, so the permission lessons still work, but
+> the sandbox will not be in the repo directory. `reset.sh` knows where it went.
 
 ---
 

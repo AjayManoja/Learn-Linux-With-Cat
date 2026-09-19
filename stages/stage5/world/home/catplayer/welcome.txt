@@ -1,0 +1,12 @@
+The last stage, {{PLAYER}}.
+
+Everything you have typed so far vanished the moment it ran.
+A script is the same commands, written into a file, kept.
+
+Three things make a file a script:
+  a first line saying which program runs it,
+  the execute bit you learned in Stage 3,
+  and commands you already know.
+
+You are not learning a new language here. You are writing down
+the one you have been speaking for four stages.

@@ -1,0 +1,15 @@
+bird
+mouse
+bird
+squirrel
+bird
+mouse
+fox
+squirrel
+bird
+mouse
+bird
+hedgehog
+squirrel
+bird
+mouse

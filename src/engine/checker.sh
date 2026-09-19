@@ -151,3 +151,13 @@ check_file_executable() {
     local filepath="${SANDBOX_HOME}/$1"
     [[ -x "$filepath" && -f "$filepath" ]]
 }
+
+# Stage 4: a background job this game started is alive.
+check_background_running() {
+    [[ -n "$(list_game_pids)" ]]
+}
+
+# Stage 4: every background job this game started has been stopped.
+check_no_background_running() {
+    [[ -z "$(list_game_pids)" ]]
+}

@@ -1,0 +1,10 @@
+Stage 4, {{PLAYER}}.
+
+Two new ideas here, and they are the last big ones.
+
+First: a command's output does not have to go to the screen.
+You can point it at a file instead. That is redirection.
+
+Second: commands are processes. They start, they run, and sometimes
+they need to be stopped. You are about to meet one that won't stop
+on its own.

@@ -66,6 +66,13 @@ BACKUP
             chmod 644 "${SANDBOX_HOME}/work/greet.sh"    2>/dev/null || true
             chmod 644 "${SANDBOX_HOME}/work/backup.sh"   2>/dev/null || true
             ;;
+        4)
+            mkdir -p "${SANDBOX_HOME}/data"
+            ;;
+        5)
+            # Stage 5 writes its own files; it only needs somewhere to put them.
+            mkdir -p "${SANDBOX_HOME}/scripts"
+            ;;
         *)
             # Future stages can add their own population logic
             :

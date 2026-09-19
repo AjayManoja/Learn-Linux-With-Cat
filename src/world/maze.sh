@@ -8,10 +8,11 @@ build_nav_maze() {
     local base_dir="${SANDBOX_HOME}"
     local spots=("Documents/.hidden_notes" "Downloads/.archive" "Pictures/.metadata" "projects/.drafts")
     
-    # Pick a random spot
+    # Pick a random spot. NAV_NOTE_DIR is global on purpose: nav_mission reads
+    # it to check the player's location and to write its final hint.
     local rand_index=$(( RANDOM % ${#spots[@]} ))
-    local chosen_spot="${spots[$rand_index]}"
-    local target_dir="${base_dir}/${chosen_spot}"
+    NAV_NOTE_DIR="${spots[$rand_index]}"
+    local target_dir="${base_dir}/${NAV_NOTE_DIR}"
     
     mkdir -p "${target_dir}"
     
@@ -71,6 +72,9 @@ build_hidden_cat_maze() {
     local final_code
     final_code=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 6 || true)
     
+    # Global: hidden_cat_mission checks the player actually reached this spot.
+    HIDDEN_FISH_DIR="${final_spot}"
+
     echo "You found the fish! 🐟" > "${base_dir}/${final_spot}/fish.txt"
     echo "Your final mission code is: ${final_code}" >> "${base_dir}/${final_spot}/fish.txt"
     

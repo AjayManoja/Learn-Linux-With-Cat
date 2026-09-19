@@ -1,0 +1,6 @@
+blanket:wool:2:attic
+string:cotton:14:drawer
+box:cardboard:5:hallway
+feather:goose:9:toybin
+bell:brass:3:collar
+ribbon:silk:7:drawer

@@ -38,7 +38,7 @@ for stage_dir in "${stage_dirs[@]}"; do
         || fail "$stage_id: stage.conf has a syntax error"
 
     set +u
-    STAGE_NAME=""; STAGE_SECTIONS=""; STAGE_COMMANDS=""; FINAL_MISSION=""
+    STAGE_NAME=""; STAGE_SECTIONS=""; STAGE_COMMANDS=""; FINAL_MISSION=""; STAGE_REVIEW=""
     source "$conf"
     set -u
 
@@ -79,6 +79,18 @@ for stage_dir in "${stage_dirs[@]}"; do
             assert_path_exists "$stage_id/$section: mission ${mission}.sh exists" \
                 "$stage_dir/missions/${mission}.sh"
         fi
+    done
+
+    # Review checkpoints: every challenge named must exist and be complete.
+    for challenge in ${STAGE_REVIEW:-}; do
+        challenge_file="$stage_dir/review/${challenge}.sh"
+        if [[ ! -f "$challenge_file" ]]; then
+            fail "$stage_id: missing review challenge ${challenge}.sh"
+            continue
+        fi
+        bash -n "$challenge_file" 2>/dev/null             && pass "$stage_id: review ${challenge}.sh parses"             || fail "$stage_id: review ${challenge}.sh has a syntax error"
+        ( set +u; unset -f check_task; source "$challenge_file"
+          [[ -n "${TASK_INSTRUCTION:-}" && -n "${HINT_3:-}" && -n "${RECALLS:-}" ]]             && type check_task >/dev/null 2>&1 )             && pass "$stage_id: review ${challenge}.sh is complete"             || fail "$stage_id: review ${challenge}.sh missing check_task, TASK_INSTRUCTION, HINT_3 or RECALLS"
     done
 
     if [[ -n "$FINAL_MISSION" ]]; then

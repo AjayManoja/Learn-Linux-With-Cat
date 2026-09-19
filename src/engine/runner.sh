@@ -16,6 +16,7 @@ load_stage() {
         source "$conf_file"
         export CURRENT_STAGE="$stage_num"
         unlock_commands "${STAGE_COMMANDS:-}"
+        unlock_syntax "${STAGE_SYNTAX:-}"
     else
         echo "Error: Stage $stage_num config not found at $conf_file"
         exit 1
@@ -42,6 +43,26 @@ command_unlocked() {
     [[ " $ALLOWED_COMMANDS " == *" $1 "* ]]
 }
 
+# Shell syntax the player has been taught. Chaining and command substitution
+# are refused until a stage teaches them, because until then they are only a
+# way around the command allowlist; once Stage 9 covers them they are the
+# subject of the lesson.
+ALLOWED_SYNTAX="${ALLOWED_SYNTAX:-}"
+
+unlock_syntax() {
+    local feature
+    for feature in $1; do
+        if [[ " $ALLOWED_SYNTAX " != *" $feature "* ]]; then
+            ALLOWED_SYNTAX="${ALLOWED_SYNTAX} $feature"
+        fi
+    done
+    ALLOWED_SYNTAX="${ALLOWED_SYNTAX# }"
+}
+
+syntax_unlocked() {
+    [[ " $ALLOWED_SYNTAX " == *" $1 "* ]]
+}
+
 # A player resuming at stage 3 never ran stages 1 and 2, so their commands
 # have to be unlocked up front or half the vocabulary disappears.
 unlock_prior_commands() {
@@ -54,6 +75,12 @@ unlock_prior_commands() {
         line="${line#STAGE_COMMANDS=}"
         line="${line//\"/}"
         unlock_commands "$line"
+
+        line=$(grep -E '^STAGE_SYNTAX=' "$conf" | head -1) || true
+        [[ -n "$line" ]] || continue
+        line="${line#STAGE_SYNTAX=}"
+        line="${line//\"/}"
+        unlock_syntax "$line"
     done
 }
 
@@ -82,10 +109,11 @@ sandbox_syntax_ok() {
 
         case "$ch" in
             "'"|'"') quote="$ch" ;;
-            ';'|'`')  return 1 ;;
-            '&') [[ "$prev" == '&' ]] && return 1 ;;   # && chains; a lone & backgrounds
-            '|') [[ "$prev" == '|' ]] && return 1 ;;   # || chains; a lone | pipes
-            '(') [[ "$prev" == '$' || "$prev" == '>' || "$prev" == '<' ]] && return 1 ;;
+            ';')  syntax_unlocked chaining || return 1 ;;
+            '`')  syntax_unlocked substitution || return 1 ;;
+            '&') [[ "$prev" == '&' ]] && { syntax_unlocked chaining || return 1; } ;;
+            '|') [[ "$prev" == '|' ]] && { syntax_unlocked chaining || return 1; } ;;
+            '(') [[ "$prev" == '$' || "$prev" == '>' || "$prev" == '<' ]]                      && { syntax_unlocked substitution || return 1; } ;;
         esac
 
         prev="$ch"
@@ -650,6 +678,89 @@ run_section() {
     mark_section_complete "$section"
 }
 
+# ── Review Checkpoints ─────────────────────────────────────
+# Every few stages the game stops teaching and asks the player to combine what
+# they learned here with what they learned earlier. Commands practised once and
+# never revisited are the ones that get forgotten, so a challenge only earns
+# its place if it needs at least two stages' worth of knowledge at the same
+# time.
+#
+# A challenge file has the same shape as a lesson — TASK_INSTRUCTION, three
+# hints, check_task — minus the teaching. It is a question, not a tutorial.
+
+run_review_challenge() {
+    local challenge_id="$1"
+    local challenge_script="${GAME_ROOT}/stages/stage${CURRENT_STAGE}/review/${challenge_id}.sh"
+
+    if [[ ! -f "$challenge_script" ]]; then
+        echo "Error: Review challenge not found: $challenge_script"
+        return 1
+    fi
+
+    reset_hint_level
+    unset -f check_task 2>/dev/null || true
+    unset -f setup_challenge 2>/dev/null || true
+    LESSON_START_DIR=""
+    RECALLS=""
+
+    source "$challenge_script"
+
+    if type setup_challenge &>/dev/null; then
+        if ! setup_challenge; then
+            show_cat "confused" "Something went wrong setting up this challenge. Type 'hint' if you get stuck."
+        fi
+    fi
+
+    ensure_current_dir_usable || true
+    if [[ -n "${LESSON_START_DIR:-}" ]]; then
+        local start_dir="${SANDBOX_HOME}/${LESSON_START_DIR}"
+        [[ -d "$start_dir" ]] && CURRENT_GAME_DIR="$start_dir"
+    fi
+
+    set_hints "${HINT_1:-}" "${HINT_2:-}" "${HINT_3:-}"
+
+    echo ""
+    show_cat "${TASK_CAT_POSE:-thinking}"
+    show_task_box "${TASK_INSTRUCTION:-Answer the question!}"
+    if [[ -n "${RECALLS:-}" ]]; then
+        echo -e "${CYAN}   Draws on: ${RECALLS}${RESET}"
+    fi
+    echo ""
+
+    interactive_prompt
+
+    mark_lesson_complete "review:${challenge_id}"
+}
+
+run_review() {
+    local challenges="${STAGE_REVIEW:-}"
+    [[ -n "$challenges" ]] || return 0
+
+    local remaining=""
+    local challenge_id
+    for challenge_id in $challenges; do
+        lesson_is_complete "review:${challenge_id}" || remaining="${remaining} ${challenge_id}"
+    done
+    [[ -n "$remaining" ]] || return 0
+
+    echo ""
+    show_section_banner "R" "${STAGE_REVIEW_NAME:-Review}"
+    show_cat "thinking" "${STAGE_REVIEW_INTRO:-Time to check what has stuck. These need more than just this stage.}"
+    echo ""
+    read -r -p "Press Enter to begin the review... "
+    echo ""
+
+    for challenge_id in $remaining; do
+        run_review_challenge "$challenge_id"
+    done
+
+    echo ""
+    show_cat "celebrate" "${STAGE_REVIEW_OUTRO:-Review passed. None of it has gone stale.}"
+    echo ""
+    read -r -p "Press Enter to continue... "
+    echo ""
+}
+
 # ── Stage Runner (Main Entry) ─────────────────────────────
 
 run_stage() {
@@ -672,6 +783,10 @@ run_stage() {
             run_section "$section"
         done
     fi
+
+    # Consolidate before the finale: the review asks for earlier stages'
+    # commands alongside this one's.
+    run_review
 
     # Run the final mission if defined
     if [[ -n "${FINAL_MISSION:-}" ]] && ! mission_is_complete "$FINAL_MISSION"; then

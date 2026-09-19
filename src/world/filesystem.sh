@@ -73,6 +73,9 @@ BACKUP
             # Stage 5 writes its own files; it only needs somewhere to put them.
             mkdir -p "${SANDBOX_HOME}/scripts"
             ;;
+        6)
+            mkdir -p "${SANDBOX_HOME}/data"
+            ;;
         *)
             # Future stages can add their own population logic
             :

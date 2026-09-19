@@ -58,6 +58,41 @@ for stage_dir in "${stage_dirs[@]}"; do
         esac
     done
 
+    # Review challenges are questions, so passing one without answering is
+    # exactly as bad as a lesson that checks nothing.
+    for challenge_file in "$stage_dir"/review/*.sh; do
+        [[ -f "$challenge_file" ]] || continue
+        challenge_name="$(basename "$challenge_file" .sh)"
+
+        rc=0
+        (
+            set +u
+            unset -f check_task setup_challenge
+            source "$challenge_file"
+            type setup_challenge >/dev/null 2>&1 && setup_challenge >/dev/null 2>&1
+            LAST_COMMAND="zzz_not_a_real_command --nonsense"
+            CURRENT_GAME_DIR="$SANDBOX_HOME"
+            type check_task >/dev/null 2>&1 || exit 2
+            check_task >/dev/null 2>&1
+        ) || rc=$?
+        case $rc in
+            0) fail "$stage_id/review/$challenge_name passes on an unrelated command" ;;
+            2) fail "$stage_id/review/$challenge_name defines no check_task" ;;
+            *) pass "$stage_id/review/$challenge_name rejects an unrelated command" ;;
+        esac
+
+        rerun_rc=0
+        (
+            set +u
+            unset -f setup_challenge
+            source "$challenge_file"
+            type setup_challenge >/dev/null 2>&1 || exit 0
+            setup_challenge >/dev/null 2>&1
+            setup_challenge >/dev/null 2>&1
+        ) || rerun_rc=$?
+        [[ "$rerun_rc" -eq 0 ]]             && pass "$stage_id/review/$challenge_name setup can run twice"             || fail "$stage_id/review/$challenge_name setup fails on a second run"
+    done
+
     # Same invariant for missions: none may be complete the moment it starts.
     for mission_file in "$stage_dir"/missions/*.sh; do
         [[ -f "$mission_file" ]] || continue

@@ -1,0 +1,11 @@
+Stage 6, {{PLAYER}}.
+
+You can find text and count text. Now you will change it.
+
+Three tools do almost all of this work:
+  cut  — take columns out of each line
+  sed  — substitute one thing for another
+  awk  — treat each line as a set of fields
+
+None of them change the file. They read it, reshape it, and print the
+result — which is why they belong on the end of a pipe.

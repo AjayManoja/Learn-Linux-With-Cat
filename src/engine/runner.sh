@@ -15,45 +15,126 @@ load_stage() {
     if [[ -f "$conf_file" ]]; then
         source "$conf_file"
         export CURRENT_STAGE="$stage_num"
+        unlock_commands "${STAGE_COMMANDS:-}"
     else
         echo "Error: Stage $stage_num config not found at $conf_file"
         exit 1
     fi
 }
 
+# ── Command Gating ─────────────────────────────────────────
+# The game only runs commands the player has been taught. Each stage.conf
+# declares STAGE_COMMANDS; load_stage unlocks them as the stage begins.
+
+ALLOWED_COMMANDS="${ALLOWED_COMMANDS:-}"
+
+unlock_commands() {
+    local c
+    for c in $1; do
+        if [[ " $ALLOWED_COMMANDS " != *" $c "* ]]; then
+            ALLOWED_COMMANDS="${ALLOWED_COMMANDS} $c"
+        fi
+    done
+    ALLOWED_COMMANDS="${ALLOWED_COMMANDS# }"
+}
+
+command_unlocked() {
+    [[ " $ALLOWED_COMMANDS " == *" $1 "* ]]
+}
+
+# A player resuming at stage 3 never ran stages 1 and 2, so their commands
+# have to be unlocked up front or half the vocabulary disappears.
+unlock_prior_commands() {
+    local upto="$1" s conf line
+    for (( s = 1; s < upto; s++ )); do
+        conf="${GAME_ROOT}/stages/stage${s}/stage.conf"
+        [[ -f "$conf" ]] || continue
+        line=$(grep -E '^STAGE_COMMANDS=' "$conf" | head -1) || true
+        [[ -n "$line" ]] || continue
+        line="${line#STAGE_COMMANDS=}"
+        line="${line//\"/}"
+        unlock_commands "$line"
+    done
+}
+
 # ── Sandbox Command Execution ─────────────────────────────
+
+# Shell syntax the sandbox refuses outright. Pipes, redirection and background
+# jobs are the point of later stages, but chaining and command substitution are
+# escape hatches around the command allowlist.
+sandbox_syntax_ok() {
+    local line="$1"
+    case "$line" in
+        *';'*|*'&&'*|*'||'*|*'`'*|*'$('*|*'>('*|*'<('*) return 1 ;;
+    esac
+    return 0
+}
+
+# Rewrite the path the player sees onto the real sandbox directory.
+map_virtual_paths() {
+    local line="$1"
+    echo "${line//\/home\/catplayer/$SANDBOX_HOME}"
+}
+
+# Every path argument must land inside the sandbox.
+sandbox_paths_ok() {
+    local line="$1" tok resolved
+    for tok in $line; do
+        case "$tok" in
+            -*|'|'|'>'|'>>'|'<'|'&') continue ;;
+            "$SANDBOX_HOME"*) continue ;;
+            /*) return 1 ;;
+            *..*)
+                resolved=$(cd "$CURRENT_GAME_DIR" 2>/dev/null && realpath -m "$tok" 2>/dev/null) || return 1
+                [[ "$resolved" == "$SANDBOX_HOME"* ]] || return 1
+                ;;
+        esac
+    done
+    return 0
+}
+
+# Each stage of a pipeline has to start with a command the player has learned.
+pipeline_commands_ok() {
+    local line="$1" segment first
+    local IFS='|'
+    for segment in $line; do
+        first=$(echo "$segment" | awk '{print $1}')
+        [[ -n "$first" ]] || continue
+        if ! command_unlocked "$first"; then
+            UNKNOWN_COMMAND="$first"
+            return 1
+        fi
+    done
+    return 0
+}
 
 execute_in_sandbox() {
     local cmd_line="$1"
     local cmd args
 
-    # Split command and arguments
     cmd=$(echo "$cmd_line" | awk '{print $1}')
     args=$(echo "$cmd_line" | cut -d' ' -f2- -s)
 
-    # Ensure we're in the right directory
     cd "$CURRENT_GAME_DIR" 2>/dev/null || true
 
+    # cd and pwd are not real commands here: the game keeps its own working
+    # directory so the player sees /home/catplayer instead of the sandbox path.
     case "$cmd" in
         cd)
             local target_dir="$args"
 
-            # Handle special cases
             if [[ -z "$target_dir" || "$target_dir" == "~" ]]; then
                 CURRENT_GAME_DIR="$SANDBOX_HOME"
                 return 0
             fi
 
-            # Handle .. and relative paths
             local new_dir
             if [[ "$target_dir" == /* ]]; then
-                # Absolute paths: remap /home/catplayer to sandbox
                 new_dir=$(echo "$target_dir" | sed "s|^/home/catplayer|$SANDBOX_HOME|")
             else
                 new_dir=$(cd "$CURRENT_GAME_DIR" && realpath -m "$target_dir" 2>/dev/null)
             fi
 
-            # Safety: ensure we stay within sandbox
             if [[ "$new_dir" != "$SANDBOX_HOME"* ]]; then
                 show_cat "warning" "Hey! You can't leave our game world!"
                 return 1
@@ -64,10 +145,10 @@ execute_in_sandbox() {
             else
                 echo "bash: cd: ${target_dir}: No such file or directory"
             fi
+            return 0
             ;;
 
         pwd)
-            # Show the virtual path (as if /home/catplayer is real)
             local rel_path
             rel_path=$(realpath --relative-to="$SANDBOX_HOME" "$CURRENT_GAME_DIR" 2>/dev/null || echo ".")
             if [[ "$rel_path" == "." ]]; then
@@ -75,117 +156,57 @@ execute_in_sandbox() {
             else
                 echo "/home/catplayer/$rel_path"
             fi
-            ;;
-
-        ls)
-            # Run ls in current game directory with any flags
-            (cd "$CURRENT_GAME_DIR" && ls $args 2>&1)
-            ;;
-
-        cat)
-            if [[ -z "$args" ]]; then
-                echo "cat: missing file operand"
-                return 1
-            fi
-            local target_file="${CURRENT_GAME_DIR}/${args}"
-            if [[ -f "$target_file" ]]; then
-                command cat "$target_file"
-            else
-                echo "cat: ${args}: No such file or directory"
-            fi
-            ;;
-
-        less)
-            if [[ -z "$args" ]]; then
-                echo "less: missing file operand"
-                return 1
-            fi
-            local target_file="${CURRENT_GAME_DIR}/${args}"
-            if [[ -f "$target_file" ]]; then
-                less "$target_file"
-            else
-                echo "less: ${args}: No such file or directory"
-            fi
-            ;;
-
-        mkdir)
-            local dir_args="$args"
-            # Strip -p flag if present
-            dir_args="${dir_args//-p /}"
-            local target_path="${CURRENT_GAME_DIR}/${dir_args}"
-            if [[ "$target_path" == "$SANDBOX_HOME"* ]]; then
-                mkdir -p "$target_path"
-            else
-                echo "mkdir: permission denied"
-            fi
-            ;;
-
-        touch)
-            local target_path="${CURRENT_GAME_DIR}/${args}"
-            if [[ "$target_path" == "$SANDBOX_HOME"* ]]; then
-                touch "$target_path"
-            else
-                echo "touch: permission denied"
-            fi
-            ;;
-
-        cp)
-            local src dst
-            src=$(echo "$args" | awk '{print $1}')
-            dst=$(echo "$args" | awk '{print $2}')
-            if [[ -z "$src" || -z "$dst" ]]; then
-                echo "cp: missing operand"
-                return 1
-            fi
-            local src_path="${CURRENT_GAME_DIR}/${src}"
-            local dst_path="${CURRENT_GAME_DIR}/${dst}"
-            if [[ -f "$src_path" && "$dst_path" == "$SANDBOX_HOME"* ]]; then
-                cp "$src_path" "$dst_path"
-            else
-                echo "cp: cannot copy '${src}' to '${dst}'"
-            fi
-            ;;
-
-        mv)
-            local src dst
-            src=$(echo "$args" | awk '{print $1}')
-            dst=$(echo "$args" | awk '{print $2}')
-            if [[ -z "$src" || -z "$dst" ]]; then
-                echo "mv: missing operand"
-                return 1
-            fi
-            local src_path="${CURRENT_GAME_DIR}/${src}"
-            local dst_path="${CURRENT_GAME_DIR}/${dst}"
-            if [[ -e "$src_path" && "$dst_path" == "$SANDBOX_HOME"* ]]; then
-                mv "$src_path" "$dst_path"
-            else
-                echo "mv: cannot move '${src}' to '${dst}'"
-            fi
+            return 0
             ;;
 
         rm)
-            local target="$args"
-            # Strip flags for safe_rm
-            target="${target//-r /}"
-            target="${target//-f /}"
-            target="${target//-rf /}"
-            target="${target//-fr /}"
-            if [[ -z "$target" ]]; then
-                echo "rm: missing operand"
-                return 1
+            # Stage 1 promises deleted files are recoverable, so rm on its own
+            # goes through the trash bin rather than the real thing.
+            if [[ "$cmd_line" != *'|'* && "$cmd_line" != *'>'* ]]; then
+                local target="$args"
+                target="${target//-r /}"
+                target="${target//-f /}"
+                target="${target//-rf /}"
+                target="${target//-fr /}"
+                if [[ -z "$target" ]]; then
+                    echo "rm: missing operand"
+                    return 0
+                fi
+                local target_path="${CURRENT_GAME_DIR}/${target}"
+                if [[ "$target_path" == "$SANDBOX_HOME"* ]]; then
+                    safe_rm "$target_path"
+                else
+                    show_cat "warning" "You can't delete things outside our game world!"
+                fi
+                return 0
             fi
-            local target_path="${CURRENT_GAME_DIR}/${target}"
-            if [[ "$target_path" == "$SANDBOX_HOME"* ]]; then
-                safe_rm "$target_path"
-            else
-                show_cat "warning" "You can't delete things outside our game world!"
-            fi
-            ;;
-
-        *)
-            show_cat "confused" "I don't know that command yet. Try 'help' to see what you've learned!"
             ;;
     esac
+
+    # Everything else runs for real, inside the sandbox, once it clears the
+    # gates. Running the genuine tools is the whole point: the player should be
+    # learning grep and sort, not an imitation of them.
+    if ! sandbox_syntax_ok "$cmd_line"; then
+        show_cat "warning" "Let's keep it to one command at a time — no ';', '&&' or backticks yet."
+        return 0
+    fi
+
+    local mapped
+    mapped=$(map_virtual_paths "$cmd_line")
+
+    if ! sandbox_paths_ok "$mapped"; then
+        show_cat "warning" "That path is outside our game world!"
+        return 0
+    fi
+
+    UNKNOWN_COMMAND=""
+    if ! pipeline_commands_ok "$mapped"; then
+        show_cat "confused" "I don't know '${UNKNOWN_COMMAND}' yet. Try 'help' to see what you've learned!"
+        return 0
+    fi
+
+    ( cd "$CURRENT_GAME_DIR" && eval "$mapped" ) 2>&1 || true
+    return 0
 }
 
 # ── Interactive Prompt ─────────────────────────────────────
@@ -248,7 +269,7 @@ interactive_prompt() {
                     fi
 
                     # Execute the command in sandbox
-                    execute_in_sandbox "$input"
+                    execute_in_sandbox "$input" || true
 
                     # Track the base command as learned
                     local base_cmd
@@ -444,5 +465,55 @@ run_stage() {
 
     # Stage complete!
     mark_stage_complete "$stage_num"
+}
+
+# ── Game Runner (Main Entry) ──────────────────────────────
+
+stage_exists() {
+    [[ -f "${GAME_ROOT}/stages/stage${1}/stage.conf" ]]
+}
+
+# Each stage ships its own world template, so the sandbox is rebuilt when the
+# player crosses into one. SANDBOX_STAGE is persisted, which keeps a resumed
+# session from wiping the world the player is standing in.
+prepare_stage_world() {
+    local stage_num="$1"
+
+    if [[ "${SANDBOX_STAGE:-}" == "$stage_num" ]] && sandbox_exists; then
+        return 0
+    fi
+
+    reset_sandbox "$stage_num"
+    populate_stage_files "$stage_num"
+    SANDBOX_STAGE="$stage_num"
+    save_progress
+}
+
+run_game() {
+    local stage_num="${1:-1}"
+
+    if ! stage_exists "$stage_num"; then
+        show_cat "celebrate" "You have finished every stage. Nothing left to teach!"
+        show_game_over_banner
+        return 0
+    fi
+
+    unlock_prior_commands "$stage_num"
+
+    while stage_exists "$stage_num"; do
+        prepare_stage_world "$stage_num"
+        run_stage "$stage_num"
+
+        stage_num=$((stage_num + 1))
+
+        if stage_exists "$stage_num"; then
+            echo ""
+            show_cat "celebrate" "Stage cleared! A harder one is waiting."
+            echo ""
+            read -r -p "Press Enter to start the next stage... "
+            echo ""
+        fi
+    done
+
     show_game_over_banner
 }

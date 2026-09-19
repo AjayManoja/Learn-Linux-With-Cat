@@ -12,6 +12,8 @@ export PLAYER_NAME="catplayer"
 export HINTS_USED=0
 export COMMANDS_PRACTICED=""
 export STAGE_1_COMPLETED=false
+# Which stage's world the sandbox currently holds; see prepare_stage_world.
+export SANDBOX_STAGE=""
 
 save_progress() {
     cat > "$PROGRESS_FILE" <<EOF
@@ -23,6 +25,7 @@ PLAYER_NAME="${PLAYER_NAME}"
 HINTS_USED="${HINTS_USED}"
 COMMANDS_PRACTICED="${COMMANDS_PRACTICED}"
 STAGE_1_COMPLETED="${STAGE_1_COMPLETED}"
+SANDBOX_STAGE="${SANDBOX_STAGE}"
 EOF
 }
 

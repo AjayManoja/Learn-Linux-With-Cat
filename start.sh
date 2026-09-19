@@ -30,11 +30,8 @@ export PLAYER_NAME
 # Load or create progress
 load_progress
 
-# Setup sandbox if needed
-if ! sandbox_exists; then
-    create_sandbox "$CURRENT_STAGE"
-    populate_stage_files "$CURRENT_STAGE"
-fi
+# The sandbox is built per stage by run_game, which knows which world each
+# stage needs.
 
 # Initialize safety
 init_safety
@@ -45,4 +42,4 @@ echo ""
 echo "Type 'hint' for help, 'progress' to check your status, or 'quit' to save and exit."
 echo ""
 
-run_stage "$CURRENT_STAGE"
+run_game "$CURRENT_STAGE"

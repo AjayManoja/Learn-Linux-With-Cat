@@ -101,6 +101,14 @@ sandbox_syntax_ok() {
     for (( i = 0; i < ${#line}; i++ )); do
         ch="${line:i:1}"
 
+        # A backslash escapes whatever follows, so the next character is data.
+        # find's -exec is terminated by a literal \; and refusing that would
+        # make the flag unusable.
+        if [[ "$prev" == '\' ]]; then
+            prev=""
+            continue
+        fi
+
         if [[ -n "$quote" ]]; then
             [[ "$ch" == "$quote" ]] && quote=""
             prev="$ch"
@@ -347,7 +355,11 @@ execute_in_sandbox() {
     # Everything else runs for real, inside the sandbox, once it clears the
     # gates. Running the genuine tools is the whole point: the player should be
     # learning grep and sort, not an imitation of them.
+    # A command the sandbox refuses did not run, so it must not count as the
+    # player's last command — otherwise a lesson checking what they typed
+    # passes for a command that never executed.
     if ! sandbox_syntax_ok "$cmd_line"; then
+        LAST_COMMAND=""
         show_cat "warning" "Let's keep it to one command at a time — no ';', '&&' or backticks yet."
         return 0
     fi
@@ -356,12 +368,14 @@ execute_in_sandbox() {
     mapped=$(map_virtual_paths "$cmd_line")
 
     if ! sandbox_paths_ok "$mapped"; then
+        LAST_COMMAND=""
         show_cat "warning" "That path is outside our game world!"
         return 0
     fi
 
     UNKNOWN_COMMAND=""
     if ! pipeline_commands_ok "$mapped"; then
+        LAST_COMMAND=""
         show_cat "confused" "I don't know '${UNKNOWN_COMMAND}' yet. Try 'help' to see what you've learned!"
         return 0
     fi

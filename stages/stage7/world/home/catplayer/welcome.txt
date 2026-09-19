@@ -1,0 +1,11 @@
+Stage 7, {{PLAYER}}.
+
+You have been finding files by name. Names are the least interesting
+thing about a file.
+
+Here you will find them by what they are: a directory or a file, big or
+small, changed today or untouched for months. Then you will do something
+to every one you found, without typing their names.
+
+And you will learn where your space has gone, which is the question
+every full disk eventually forces you to ask.

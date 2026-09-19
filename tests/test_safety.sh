@@ -135,6 +135,27 @@ assert_ok "allows a quoted semicolon"          sandbox_syntax_ok "echo 'if [ -f 
 assert_ok "allows a quoted pipe"               sandbox_syntax_ok "echo 'sort a | uniq -c' >> s.sh"
 assert_ok "allows a semicolon inside a search" sandbox_syntax_ok "grep 'a;b' file.txt"
 
+# find -exec is terminated by a literal \; — refusing that makes the flag,
+# and every lesson that teaches it, impossible to use.
+assert_ok "allows the escaped semicolon find -exec needs"     sandbox_syntax_ok 'find . -name "*.md" -exec wc -l {} \;'
+assert_ok "allows an escaped semicolon as an argument"     sandbox_syntax_ok 'echo hi \; there'
+assert_fails "still refuses a bare semicolon after an escape elsewhere"     sandbox_syntax_ok 'find . -exec ls {} \; ; whoami'
+
+# A command the gates refuse never ran, so it must not satisfy a lesson that
+# checks what the player last typed.
+CURRENT_GAME_DIR="$SANDBOX_HOME"
+LAST_COMMAND="ls; whoami"
+execute_in_sandbox "ls; whoami" >/dev/null 2>&1 || true
+assert_eq "a refused command is not recorded as the last command" "" "$LAST_COMMAND"
+
+LAST_COMMAND="cat /etc/passwd"
+execute_in_sandbox "cat /etc/passwd" >/dev/null 2>&1 || true
+assert_eq "a command refused for its path is not recorded either" "" "$LAST_COMMAND"
+
+LAST_COMMAND="ls"
+execute_in_sandbox "ls" >/dev/null 2>&1 || true
+assert_eq "a command that ran is still recorded" "ls" "$LAST_COMMAND"
+
 # ── Stage 4: the kill gate ─────────────────────────────────
 # 'kill' takes a raw PID, so nothing but an explicit allowlist stops a player
 # from stopping their own shell or editor.

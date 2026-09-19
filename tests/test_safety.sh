@@ -5,6 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 make_test_root
 source "$REPO_ROOT/src/world/sandbox.sh"
 source "$REPO_ROOT/src/engine/safety.sh"
+source "$REPO_ROOT/src/engine/checker.sh"
 
 echo "Testing safety filter..."
 
@@ -45,6 +46,43 @@ assert_eq "cd into a real subdirectory works" "$SANDBOX_HOME/Documents" "$CURREN
 
 execute_in_sandbox "cd .." >/dev/null 2>&1 || true
 assert_eq "cd .. back to home works" "$SANDBOX_HOME" "$CURRENT_GAME_DIR"
+
+# ── rm and the trash bin ───────────────────────────────────
+# rm is the one command that destroys the player's work, and it is routed
+# through safe_rm so deletions stay recoverable. It reported "No such file or
+# directory" for files that existed, because the caller and safe_rm each
+# prefixed the sandbox path.
+unlock_commands "rm ls cat"
+mkdir -p "$SANDBOX_HOME"
+CURRENT_GAME_DIR="$SANDBOX_HOME"
+
+echo "junk" > "$SANDBOX_HOME/junk.txt"
+execute_in_sandbox "rm junk.txt" >/dev/null 2>&1 || true
+assert_ok    "rm deletes a file that exists"  check_file_missing "junk.txt"
+assert_ok    "rm keeps the file in the trash" test -e "${TRASH_DIR}/junk.txt"
+
+# The message must name what the player typed, not the real sandbox path,
+# which would leak where the game actually lives.
+echo "gone" > "$SANDBOX_HOME/present.txt"
+rm_output="$(execute_in_sandbox "rm missing.txt" 2>&1 || true)"
+assert_ok    "rm reports the typed name for a missing file"     grep -qF "cannot remove 'missing.txt'" <<< "$rm_output"
+assert_fails "rm does not leak the sandbox path"     grep -qF "$SANDBOX_HOME" <<< "$rm_output"
+
+# Flags must not be mistaken for filenames, in any spelling.
+mkdir -p "$SANDBOX_HOME/adir" && echo x > "$SANDBOX_HOME/adir/inner.txt"
+execute_in_sandbox "rm -rf adir" >/dev/null 2>&1 || true
+assert_ok "rm -rf removes a directory" check_file_missing "adir"
+
+echo a > "$SANDBOX_HOME/one.txt"; echo b > "$SANDBOX_HOME/two.txt"
+execute_in_sandbox "rm one.txt two.txt" >/dev/null 2>&1 || true
+assert_ok "rm removes the first of several operands"  check_file_missing "one.txt"
+assert_ok "rm removes the second of several operands" check_file_missing "two.txt"
+
+# Containment still holds.
+outside="${TEST_ROOT}/outside.txt"
+echo "do not touch" > "$outside"
+execute_in_sandbox "rm ../../outside.txt" >/dev/null 2>&1 || true
+assert_ok "rm cannot reach outside the sandbox" test -e "$outside"
 
 # ── The syntax gate ────────────────────────────────────────
 # Chaining and command substitution would route around the command

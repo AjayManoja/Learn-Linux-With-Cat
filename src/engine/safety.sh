@@ -30,14 +30,32 @@ check_safety() {
     return 0
 }
 
+# Takes an already-resolved absolute path, plus the name the player typed so
+# messages can use it. It used to prefix SANDBOX_HOME onto its argument while
+# the caller passed an absolute path, producing <sandbox>/<sandbox>/file — so
+# every rm reported "No such file or directory" for a file that was right
+# there, and nothing was ever deleted.
 safe_rm() {
-    local target="$1"
-    local full_path="${SANDBOX_HOME}/${target}"
-    
-    if [[ -e "$full_path" ]]; then
-        mv "$full_path" "$TRASH_DIR/"
-    else
-        echo "rm: cannot remove '$target': No such file or directory"
+    local full_path="$1"
+    local display="${2:-$1}"
+
+    # Re-check containment here: this is the function that does the deleting.
+    if [[ "$full_path" != "${SANDBOX_HOME}"* ]]; then
+        echo "rm: cannot remove '${display}': Permission denied"
+        return 1
+    fi
+
+    if [[ ! -e "$full_path" ]]; then
+        echo "rm: cannot remove '${display}': No such file or directory"
+        return 1
+    fi
+
+    # The sandbox is rebuilt per stage, which takes the trash with it, so make
+    # sure the bin exists before moving anything into it.
+    mkdir -p "$TRASH_DIR"
+
+    if ! mv "$full_path" "$TRASH_DIR/" 2>/dev/null; then
+        echo "rm: cannot remove '${display}'"
         return 1
     fi
 }

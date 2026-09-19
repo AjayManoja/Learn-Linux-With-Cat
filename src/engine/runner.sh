@@ -246,20 +246,29 @@ execute_in_sandbox() {
             # Stage 1 promises deleted files are recoverable, so rm on its own
             # goes through the trash bin rather than the real thing.
             if [[ "$cmd_line" != *'|'* && "$cmd_line" != *'>'* ]]; then
-                local target="$args"
-                target="${target//-r /}"
-                target="${target//-f /}"
-                target="${target//-rf /}"
-                target="${target//-fr /}"
-                if [[ -z "$target" ]]; then
+                local rm_target rm_path rm_any=false
+
+                for rm_target in $args; do
+                    # Flags are skipped rather than stripped by string edits,
+                    # which missed anything not written exactly as "-rf ".
+                    [[ "$rm_target" == -* ]] && continue
+                    rm_any=true
+
+                    if [[ "$rm_target" == /* ]]; then
+                        rm_path=$(echo "$rm_target" | sed "s|^/home/catplayer|$SANDBOX_HOME|")
+                    else
+                        rm_path="${CURRENT_GAME_DIR}/${rm_target}"
+                    fi
+
+                    if [[ "$rm_path" == "$SANDBOX_HOME"* ]]; then
+                        safe_rm "$rm_path" "$rm_target" || true
+                    else
+                        show_cat "warning" "You can't delete things outside our game world!"
+                    fi
+                done
+
+                if [[ "$rm_any" == false ]]; then
                     echo "rm: missing operand"
-                    return 0
-                fi
-                local target_path="${CURRENT_GAME_DIR}/${target}"
-                if [[ "$target_path" == "$SANDBOX_HOME"* ]]; then
-                    safe_rm "$target_path"
-                else
-                    show_cat "warning" "You can't delete things outside our game world!"
                 fi
                 return 0
             fi

@@ -12,7 +12,9 @@ show_cat() {
   fi
 
   echo -e "${YELLOW}"
-  cat "${art_file}"
+  # Never let a missing or unreadable pose swallow the message below it: under
+  # `set -e` a failing cat here would abort the function mid-way.
+  cat "${art_file}" 2>/dev/null || true
   echo -e "${RESET}"
 
   if [[ -n "${message}" ]]; then

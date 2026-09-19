@@ -135,7 +135,7 @@ sandbox_paths_ok() {
             "$SANDBOX_HOME"*) continue ;;
             /*) return 1 ;;
             *..*)
-                resolved=$(cd "$CURRENT_GAME_DIR" 2>/dev/null && realpath -m "$tok" 2>/dev/null) || return 1
+                resolved=$(realpath -m "${CURRENT_GAME_DIR}/${tok}" 2>/dev/null) || return 1
                 [[ "$resolved" == "$SANDBOX_HOME"* ]] || return 1
                 ;;
         esac
@@ -191,6 +191,50 @@ list_game_pids() {
     done < "$file"
 }
 
+# The path as the player sees it, with the sandbox root shown as their home.
+virtual_path() {
+    local dir="${1:-$CURRENT_GAME_DIR}"
+    local rel
+    rel=$(realpath --relative-to="$SANDBOX_HOME" "$dir" 2>/dev/null || echo ".")
+    if [[ "$rel" == "." ]]; then
+        echo "/home/catplayer"
+    else
+        echo "/home/catplayer/$rel"
+    fi
+}
+
+# Stage 3 lets the player chmod any directory — including the one they are
+# standing in. Once that loses its execute bit nothing can enter it, so every
+# command failed at the `cd`, `cd ..` failed with it, and the session was stuck
+# with no way out but quitting. Move them to the nearest directory that still
+# works and say what happened, leaving their chmod alone: owning the directory
+# is exactly what lets them undo it.
+ensure_current_dir_usable() {
+    [[ -d "$CURRENT_GAME_DIR" && -x "$CURRENT_GAME_DIR" ]] && return 0
+
+    local stranded_at
+    stranded_at="$(virtual_path "$CURRENT_GAME_DIR")"
+
+    local candidate="$CURRENT_GAME_DIR"
+    while [[ "$candidate" == "$SANDBOX_HOME"/* ]]; do
+        candidate="$(dirname "$candidate")"
+        if [[ -d "$candidate" && -x "$candidate" ]]; then
+            break
+        fi
+    done
+
+    if [[ ! -d "$candidate" || ! -x "$candidate" ]]; then
+        # Even home is shut; reopen that much or there is no game left.
+        ensure_sandbox_dir "$SANDBOX_HOME" >/dev/null 2>&1 || true
+        candidate="$SANDBOX_HOME"
+    fi
+
+    CURRENT_GAME_DIR="$candidate"
+
+    show_cat "warning" "You locked ${stranded_at} while standing in it, so I moved you to $(virtual_path "$candidate"). You still own it — 'chmod u+rwx' on it will open it again."
+    return 1
+}
+
 execute_in_sandbox() {
     local cmd_line="$1"
     local cmd args
@@ -198,6 +242,7 @@ execute_in_sandbox() {
     cmd=$(echo "$cmd_line" | awk '{print $1}')
     args=$(echo "$cmd_line" | cut -d' ' -f2- -s)
 
+    ensure_current_dir_usable || true
     cd "$CURRENT_GAME_DIR" 2>/dev/null || true
 
     # cd and pwd are not real commands here: the game keeps its own working
@@ -215,7 +260,9 @@ execute_in_sandbox() {
             if [[ "$target_dir" == /* ]]; then
                 new_dir=$(echo "$target_dir" | sed "s|^/home/catplayer|$SANDBOX_HOME|")
             else
-                new_dir=$(cd "$CURRENT_GAME_DIR" && realpath -m "$target_dir" 2>/dev/null)
+                # Resolved against the current directory rather than from
+                # inside it: entering it may be exactly what is impossible.
+                new_dir=$(realpath -m "${CURRENT_GAME_DIR}/${target_dir}" 2>/dev/null)
             fi
 
             if [[ "$new_dir" != "$SANDBOX_HOME"* ]]; then
@@ -232,13 +279,7 @@ execute_in_sandbox() {
             ;;
 
         pwd)
-            local rel_path
-            rel_path=$(realpath --relative-to="$SANDBOX_HOME" "$CURRENT_GAME_DIR" 2>/dev/null || echo ".")
-            if [[ "$rel_path" == "." ]]; then
-                echo "/home/catplayer"
-            else
-                echo "/home/catplayer/$rel_path"
-            fi
+            virtual_path "$CURRENT_GAME_DIR"
             return 0
             ;;
 
@@ -319,14 +360,20 @@ execute_in_sandbox() {
     # and, later, verified by the kill gate above.
     if [[ "$mapped" =~ \&[[:space:]]*$ ]]; then
         local bg_cmd="${mapped%&}"
-        ( cd "$CURRENT_GAME_DIR" && eval "$bg_cmd" ) >/dev/null 2>&1 &
+        ( cd "$CURRENT_GAME_DIR" 2>/dev/null && eval "$bg_cmd" ) >/dev/null 2>&1 &
         local bg_pid=$!
         record_game_pid "$bg_pid"
         echo "[background] started with PID ${bg_pid}"
         return 0
     fi
 
-    ( cd "$CURRENT_GAME_DIR" && eval "$mapped" ) 2>&1 || true
+    if ! ( cd "$CURRENT_GAME_DIR" 2>/dev/null && eval "$mapped" ) 2>&1; then
+        # The command itself failing is normal and its own message already
+        # said so; only report the case where we could not even get there.
+        if [[ ! -x "$CURRENT_GAME_DIR" ]]; then
+            echo "bash: cannot access $(virtual_path "$CURRENT_GAME_DIR"): Permission denied"
+        fi
+    fi
     return 0
 }
 

@@ -3,6 +3,8 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 make_test_root
+source "$REPO_ROOT/src/ui/colors.sh"
+source "$REPO_ROOT/src/ui/cat.sh"
 source "$REPO_ROOT/src/world/sandbox.sh"
 source "$REPO_ROOT/src/engine/safety.sh"
 source "$REPO_ROOT/src/engine/checker.sh"
@@ -30,7 +32,7 @@ assert_ok    "cat allowed"           check_safety "cat notes.txt"
 # Staying inside the sandbox is enforced by the cd handler, not the blocklist,
 # so it has to be exercised where it actually lives.
 source "$REPO_ROOT/src/engine/runner.sh"
-show_cat() { :; }   # stub: the warning path draws a cat
+# show_cat is the real one: some of these checks assert on what it says.
 
 mkdir -p "$SANDBOX_HOME/Documents"
 CURRENT_GAME_DIR="$SANDBOX_HOME"
@@ -83,6 +85,38 @@ outside="${TEST_ROOT}/outside.txt"
 echo "do not touch" > "$outside"
 execute_in_sandbox "rm ../../outside.txt" >/dev/null 2>&1 || true
 assert_ok "rm cannot reach outside the sandbox" test -e "$outside"
+
+# ── Standing in a directory you just locked ────────────────
+# Stage 3 hands the player chmod, so they can remove the execute bit from the
+# directory they are standing in. Every command then failed at the cd, and
+# `cd ..` failed with them, so the only way out was quitting the game.
+mkdir -p "$SANDBOX_HOME/cellar"
+echo "loot" > "$SANDBOX_HOME/cellar/box.txt"
+CURRENT_GAME_DIR="$SANDBOX_HOME/cellar"
+chmod 000 "$SANDBOX_HOME/cellar"
+
+# Redirected to a file rather than captured with $( ), which would run the
+# whole thing in a subshell and throw away the relocation being tested.
+locked_out="${TEST_ROOT}/locked.out"
+execute_in_sandbox "ls" > "$locked_out" 2>&1 || true
+
+assert_eq "a locked current directory moves the player out"     "$SANDBOX_HOME" "$CURRENT_GAME_DIR"
+assert_ok "the player is told which directory they locked"     grep -qF "/home/catplayer/cellar" "$locked_out"
+assert_fails "the real sandbox path is never shown"     grep -qF "$SANDBOX_ROOT" "$locked_out"
+
+# And the way back in is the command the message names.
+execute_in_sandbox "chmod u+rwx cellar" >/dev/null 2>&1 || true
+execute_in_sandbox "cd cellar" >/dev/null 2>&1 || true
+assert_eq "the player can re-enter once they unlock it"     "$SANDBOX_HOME/cellar" "$CURRENT_GAME_DIR"
+
+# Leaving a locked directory must not require entering it first.
+chmod 000 "$SANDBOX_HOME/cellar"
+CURRENT_GAME_DIR="$SANDBOX_HOME/cellar"
+execute_in_sandbox "cd .." >/dev/null 2>&1 || true
+assert_eq "cd .. escapes a locked directory" "$SANDBOX_HOME" "$CURRENT_GAME_DIR"
+
+chmod 755 "$SANDBOX_HOME/cellar"
+CURRENT_GAME_DIR="$SANDBOX_HOME"
 
 # ── The syntax gate ────────────────────────────────────────
 # Chaining and command substitution would route around the command

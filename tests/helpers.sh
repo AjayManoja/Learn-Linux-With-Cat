@@ -28,6 +28,9 @@ cleanup_test_root() {
 make_test_root() {
     TEST_ROOT="$(mktemp -d)"
     cp -r "$REPO_ROOT/stages" "$TEST_ROOT/"
+    # show_cat reads its art from GAME_ROOT; without these the cat cannot
+    # speak, and any message it carries is lost.
+    cp -r "$REPO_ROOT/assets" "$TEST_ROOT/"
     GAME_ROOT="$TEST_ROOT"
     export GAME_ROOT
     trap cleanup_test_root EXIT

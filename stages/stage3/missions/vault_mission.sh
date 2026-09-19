@@ -17,15 +17,26 @@ HINT_3="Run: chmod 600 vault/treats.txt   then: cat vault/treats.txt"
 VAULT_OPENED=false
 
 setup_mission() {
+    local vault_file="${SANDBOX_HOME}/vault/treats.txt"
+
     VAULT_OPENED=false
-    mkdir -p "${SANDBOX_HOME}/vault"
-    cat > "${SANDBOX_HOME}/vault/treats.txt" <<'TREATS'
+
+    # Two ways this directory can be unusable by the time we get here: the
+    # player locked it themselves while practising chmod, or a previous attempt
+    # left treats.txt at 000. Reopen the directory first — that is what makes
+    # the file removable, since deletion needs write permission on the
+    # directory rather than on the file.
+    ensure_sandbox_dir "${SANDBOX_HOME}/vault"
+    rm -f "$vault_file" 2>/dev/null || true
+
+    cat > "$vault_file" <<'TREATS'
 THE STASH
 
 Third shelf, behind the cereal.
 The humans have never once looked there.
 TREATS
-    chmod 000 "${SANDBOX_HOME}/vault/treats.txt" 2>/dev/null || true
+
+    chmod 000 "$vault_file" 2>/dev/null || true
 }
 
 check_mission() {

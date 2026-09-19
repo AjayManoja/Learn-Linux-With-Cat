@@ -82,6 +82,25 @@ for stage_dir in "${stage_dirs[@]}"; do
             *) pass "$stage_id/$mission_name starts incomplete" ;;
         esac
 
+        # Setup must survive being run twice. A player who quits partway
+        # through a mission runs it again on their next session, and a setup
+        # that cannot cope with the state it left behind takes the whole game
+        # down with it — mission scripts carry their own `set -e`.
+        rerun_rc=0
+        (
+            set +u
+            unset -f setup_mission
+            source "$mission_file"
+            type setup_mission >/dev/null 2>&1 || exit 0
+            setup_mission >/dev/null 2>&1
+            setup_mission >/dev/null 2>&1
+        ) || rerun_rc=$?
+        if [[ "$rerun_rc" -eq 0 ]]; then
+            pass "$stage_id/$mission_name setup can run twice"
+        else
+            fail "$stage_id/$mission_name setup fails on a second run"
+        fi
+
         # Some missions launch real processes; do not leave them running.
         pid_file="$(game_pid_file)"
         if [[ -f "$pid_file" ]]; then

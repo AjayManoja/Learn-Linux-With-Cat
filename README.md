@@ -165,6 +165,8 @@ pwd → ls + pwd → cd + pwd → cd + ls + pwd → cd + ls -la + cat → 🧩 M
   shell or editor
 - ♻️ `rm` moves files to Cat's Trash Bin (`.cat_trash`) instead of deleting
   them, so a mistake is recoverable
+- 🔓 Locking yourself out is not fatal: Stage 3 encourages you to `chmod`
+  things, and the game reopens any directory it needs before staging a mission
 - 🚫 Dangerous commands (`rm -rf /`, `sudo`, `wget`, etc.) are blocked
 - 🐳 Docker option for full isolation
 

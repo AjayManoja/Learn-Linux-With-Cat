@@ -67,4 +67,35 @@ CURRENT_GAME_DIR="$SANDBOX_HOME/$HIDDEN_FISH_DIR"
 assert_ok "fish: complete once the player reaches the fish" check_mission
 destroy_sandbox
 
+# ── stage 3: the vault, after the player has used chmod on it ───────────────
+# Stage 3 teaches chmod and then asks the player to practise it. Locking the
+# directory a mission stages its files in is a reasonable thing to try, and it
+# used to leave setup_mission unable to write there — which, because mission
+# scripts carry their own `set -e`, killed the session outright.
+create_sandbox 3 >/dev/null
+populate_stage_files 3 >/dev/null 2>&1 || true
+source "$REPO_ROOT/stages/stage3/missions/vault_mission.sh"
+
+assert_ok "vault: setup works on a clean world" setup_mission
+
+# The state that crashed the game: locked directory, unreadable file inside.
+chmod 400 "$SANDBOX_HOME/vault"
+assert_ok "vault: setup recovers from a locked directory" setup_mission
+assert_ok "vault: the directory is usable again" test -w "$SANDBOX_HOME/vault"
+assert_eq "vault: the file is locked again for the player"     "0" "$(stat -c %a "$SANDBOX_HOME/vault/treats.txt")"
+
+# And the mission is still winnable from there.
+CURRENT_GAME_DIR="$SANDBOX_HOME"
+LAST_COMMAND="cat vault/treats.txt"
+assert_fails "vault: still locked before the player unlocks it" check_mission
+chmod 600 "$SANDBOX_HOME/vault/treats.txt"
+assert_ok "vault: completes once unlocked and read" check_mission
+
+# A locked home must not shut the player out either.
+chmod 000 "$SANDBOX_HOME/vault" 2>/dev/null || true
+assert_ok "ensure_sandbox_dir reopens a fully locked directory"     ensure_sandbox_dir "$SANDBOX_HOME/vault"
+assert_fails "ensure_sandbox_dir refuses paths outside the sandbox"     ensure_sandbox_dir "/etc"
+
+destroy_sandbox
+
 finish "Mission tests"

@@ -446,6 +446,12 @@ run_lesson() {
     # Source the lesson (defines variables + check_task function)
     source "$lesson_script"
 
+    if type setup_lesson &>/dev/null; then
+        if ! setup_lesson; then
+            show_cat "confused" "Something went wrong setting up this lesson. Type 'hint' if you get stuck."
+        fi
+    fi
+
     # A lesson may require the player to be somewhere specific. Without this a
     # lesson picks up wherever the last one — or the last mission — left them,
     # which breaks its instructions and can make its check pass for free.
@@ -510,9 +516,18 @@ run_mission() {
     # Set hints
     set_hints "${HINT_1:-}" "${HINT_2:-}" "${HINT_3:-}"
 
-    # Run mission setup (creates maze, places files, etc.)
+    # Every mission stages files somewhere under home, so make sure home
+    # itself is reachable before setup tries.
+    ensure_sandbox_dir "$SANDBOX_HOME" || true
+
+    # Run mission setup (creates maze, places files, etc.).
+    # Mission scripts carry their own `set -e`, so an error in here used to
+    # abort the game and drop the player back at their shell, losing the
+    # session. Report it and carry on instead.
     if type setup_mission &>/dev/null; then
-        setup_mission
+        if ! setup_mission; then
+            show_cat "confused" "Something went wrong setting up this mission. Type 'hint' if you get stuck."
+        fi
     fi
 
     # Show mission briefing

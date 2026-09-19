@@ -15,6 +15,9 @@ HINT_2="600 is rw-------, 644 is rw-r--r--, 755 is rwxr-xr-x."
 HINT_3="Run: chmod 600 secrets.txt / chmod 644 report.txt / chmod 755 backup.sh"
 
 setup_mission() {
+    # The player has chmod by now and may have locked this directory.
+    ensure_sandbox_dir "${SANDBOX_HOME}/work"
+
     # Start them all wrong, so the mission cannot pass without doing the work.
     chmod 666 "${SANDBOX_HOME}/work/secrets.txt" 2>/dev/null || true
     chmod 600 "${SANDBOX_HOME}/work/report.txt"  2>/dev/null || true

@@ -1,27 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-GAME_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$GAME_ROOT/src/engine/checker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
+make_test_root
+source "$REPO_ROOT/src/engine/checker.sh"
 
 echo "Testing checker..."
 
-test_dir="/tmp/cat_test_$$"
-mkdir -p "$test_dir"
-touch "$test_dir/test_file.txt"
+# checker.sh resolves every path against SANDBOX_HOME, so the arguments are
+# sandbox-relative, never absolute.
+mkdir -p "$SANDBOX_HOME/Documents"
+echo "hello cat" > "$SANDBOX_HOME/notes.txt"
 
-if check_file_exists "$test_dir/test_file.txt" >/dev/null 2>&1; then
-    echo "PASS: check_file_exists found file"
-else
-    echo "FAIL: check_file_exists did not find file"
-fi
+assert_ok    "check_file_exists finds a file"          check_file_exists "notes.txt"
+assert_fails "check_file_exists rejects a missing file" check_file_exists "nope.txt"
+assert_ok    "check_dir_exists finds a directory"       check_dir_exists "Documents"
+assert_fails "check_dir_exists rejects a missing dir"   check_dir_exists "Nowhere"
+assert_ok    "check_file_missing passes when absent"    check_file_missing "nope.txt"
+assert_fails "check_file_missing fails when present"    check_file_missing "notes.txt"
+assert_ok    "check_file_content matches"               check_file_content "notes.txt" "hello cat"
+assert_fails "check_file_content rejects a mismatch"    check_file_content "notes.txt" "hello dog"
 
-if ! check_file_exists "$test_dir/missing_file.txt" >/dev/null 2>&1; then
-    echo "PASS: check_file_exists handled missing file correctly"
-else
-    echo "FAIL: check_file_exists failed on missing file"
-fi
+cp "$SANDBOX_HOME/notes.txt" "$SANDBOX_HOME/notes_backup.txt"
+assert_ok    "check_file_copied sees both files"        check_file_copied "notes.txt" "notes_backup.txt"
 
-rm -rf "$test_dir"
+echo "snacks" > "$SANDBOX_HOME/cat_food.txt"
+assert_fails "check_file_moved fails before the move"   check_file_moved "cat_food.txt" "snacks.txt"
+mv "$SANDBOX_HOME/cat_food.txt" "$SANDBOX_HOME/snacks.txt"
+assert_ok    "check_file_moved sees source gone"        check_file_moved "cat_food.txt" "snacks.txt"
 
-echo "Checker tests complete."
+# Lessons phrase locations the way the player sees them, so check_current_dir
+# has to accept the virtual /home/catplayer root as well as a relative name.
+CURRENT_GAME_DIR="$SANDBOX_HOME"
+assert_ok    "check_current_dir accepts virtual home"   check_current_dir "/home/catplayer"
+CURRENT_GAME_DIR="$SANDBOX_HOME/Documents"
+assert_ok    "check_current_dir accepts a relative dir" check_current_dir "Documents"
+assert_ok    "check_current_dir accepts a virtual path" check_current_dir "/home/catplayer/Documents"
+assert_fails "check_current_dir rejects a wrong dir"    check_current_dir "Downloads"
+
+LAST_COMMAND="cat welcome.txt"
+assert_ok    "check_command_run matches last command"   check_command_run "cat welcome.txt"
+assert_fails "check_command_run rejects another"        check_command_run "ls"
+
+assert_ok    "check_command_output matches expected"    check_command_output "echo meow" "meow"
+assert_fails "check_command_output rejects a mismatch"  check_command_output "echo meow" "woof"
+# Calling this with one argument used to abort the whole game under `set -u`.
+assert_ok    "check_command_output survives a missing expected argument" \
+             check_command_output "echo meow"
+
+finish "Checker tests"

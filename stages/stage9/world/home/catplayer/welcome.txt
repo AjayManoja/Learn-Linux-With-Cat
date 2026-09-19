@@ -1,0 +1,11 @@
+Stage 9, {{PLAYER}}.
+
+Until now the shell has been a place you type commands. This stage is
+about the shell itself.
+
+Where does it find the programs you run? What does a command leave behind
+when it finishes? How do you say "do this, and only if it worked, do
+that"?
+
+Two characters you have not been allowed to type yet are about to become
+the point rather than the problem.

@@ -31,5 +31,5 @@ check_mission() {
     # Completed by navigating into the directory holding note.txt. Section A has
     # only taught pwd, ls, ls -la and cd, so the check has to be reachable with
     # those alone — reading the file is not yet possible.
-    check_current_dir "${NAV_NOTE_DIR}" && check_file_exists "${NAV_NOTE_DIR}/note.txt"
+    check_current_dir "${NAV_NOTE_DIR:-}" && check_file_exists "${NAV_NOTE_DIR:-}/note.txt"
 }

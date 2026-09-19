@@ -1,0 +1,1 @@
+Every command returns a number. Zero means it worked.

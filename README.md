@@ -45,26 +45,52 @@ Clone repo → ./start.sh → 🐱 Cat appears → Learn ONE command
 
 ---
 
-## 🗺️ The Five Stages
+## 🗺️ The Ten Stages
 
 Each stage unlocks new commands and reuses everything before it. The sandbox is
-rebuilt from that stage's own world when you cross into it.
+rebuilt from that stage's own world when you cross into it, and refuses any
+command you have not been taught yet.
 
 | # | Stage | You learn | Final mission |
 |---|-------|-----------|---------------|
 | 1 | **Welcome to Linux** | `pwd` `ls` `ls -la` `cd` `cat` `less` `mkdir` `touch` `cp` `mv` `rm` | Find the hidden fish toy 🐟 |
-| 2 | **Finding Things** | `head` `tail` `wc` `grep` (`-i` `-n` `-r`) `find -name` and the pipe `\|` | Identify an intruder from 400 log lines |
+| 2 | **Finding Things** | `head` `tail` `wc` `grep` (`-i` `-n` `-r`) `find -name`, the pipe | Identify an intruder in 400 log lines |
 | 3 | **Locks and Keys** | `ls -l` `whoami` `id` `stat` `chmod` (numeric + symbolic) `chown` | Open a vault locked at `000` |
-| 4 | **Streams and Processes** | `echo` `>` `>>` `sort` `uniq` `ps` `&` `kill` | Build a report with a header and a tally |
-| 5 | **Cat's First Script** | `#!` shebang, `chmod +x`, variables, `$1`, `if`, `for` | Write a script that uses all of it 🎓 |
+| 4 | **Streams and Processes** | `echo` `>` `>>` `sort` `uniq` `ps` `&` `kill` | Build a report with header and tally |
+| 5 | **Cat's First Script** | `#!` `chmod +x`, variables, `$1`, `if`, `for` | Write a script using all of it |
+| 6 | **Text Surgery** | `cut` `tr` `nl` `sed` (substitute, global, delete) `awk` (fields, conditions) | Filter one column by another |
+| 7 | **Finding and Measuring** | `find -type/-size/-mmin/-exec` `xargs` `du` `df` `ln -s` | Count every matching file in bulk |
+| 8 | **Archives and Integrity** | `tar` (create, list, extract, compress) `gzip` `diff` `sha256sum` | Ship an archive with a proof |
+| 9 | **The Shell Itself** | `env` `export` `PATH` `which` `$?` `&&` `\|\|` `;` `$( )` | Build a one-liner with substitution |
+| 10 | **The Toolkit** | `tee` `basename` `mktemp` `exit`, argument guards, `set -euo pipefail` | Write a real tool 🎓 |
 
-**The arc:** find your way around → search instead of reading → control who may do
-what → send output where you want it → stop typing commands and write them down.
+**The arc:** find your way around → search instead of reading → control who may
+do what → send output where you want it → write it down → reshape text → search
+by what things *are* → bundle and verify → understand the shell itself → build
+tools out of all of it.
 
-Stage 3 is where the game stops being read-only: a file set to `000` genuinely
-refuses you until you change it. Stage 4 starts real background processes that
-you find with `ps` and stop with `kill`. Stage 5 has you write, chmod and run
-actual scripts.
+---
+
+## 🔁 Review Checkpoints
+
+Commands practised once and never revisited are the ones that go. Every few
+stages the game stops teaching and asks questions that **cannot be answered with
+the current stage alone**.
+
+| After stage | Checkpoint | Example |
+|-------------|------------|---------|
+| 3 | Stages 1–3 | Find a file (S2), then read its permissions (S3) |
+| 5 | Stages 1–5 | Write a script (S5) that greps (S2) and redirects (S4) |
+| 7 | Stages 1–7 | Measure to find the biggest file (S7), then lock it (S3) |
+| 10 | Everything | An argument, a guard, a search, a substitution and a redirect |
+
+Each challenge prints the stages it draws on, so you can see why it is being
+asked:
+
+```
+✅  Find the largest file in hoard/, then lock it to 600.
+   Draws on: Stage 7 — du, sort · Stage 3 — chmod
+```
 
 ---
 
@@ -216,14 +242,15 @@ learn-linux-with-cat/
 │   └── sad.txt           😢 Errors
 │
 ├── stages/
-│   ├── stage1/           🐾 Welcome to Linux
-│   ├── stage2/           🔍 Finding Things
-│   ├── stage3/           🔐 Locks and Keys
-│   ├── stage4/           🌊 Streams and Processes
-│   └── stage5/           📜 Cat's First Script
+│   ├── stage1/  🐾 Welcome to Linux      stage6/  ✂️  Text Surgery
+│   ├── stage2/  🔍 Finding Things        stage7/  📏 Finding and Measuring
+│   ├── stage3/  🔐 Locks and Keys        stage8/  📦 Archives and Integrity
+│   ├── stage4/  🌊 Streams & Processes   stage9/  🐚 The Shell Itself
+│   └── stage5/  📜 Cat's First Script    stage10/ 🧰 The Toolkit
 │       ├── stage.conf    📋 Metadata, lesson order, unlocked commands
 │       ├── lessons/      📚 Lesson scripts
 │       ├── missions/     🧩 Missions
+│       ├── review/       🔁 Checkpoint challenges (stages 3, 5, 7, 10)
 │       └── world/        🌍 Filesystem template
 │
 └── tests/
@@ -255,7 +282,14 @@ stages/stage6/
 
 `STAGE_COMMANDS` lists what that stage unlocks. The sandbox refuses anything
 the player has not been taught yet, so a command missing from this list will
-be rejected even if the lesson teaches it.
+be rejected even if the lesson teaches it. `STAGE_SYNTAX` does the same for
+shell syntax — chaining (`;` `&&` `||`) and command substitution are refused
+until Stage 9 declares them, because until then they are only a way around the
+command allowlist.
+
+`STAGE_REVIEW` names checkpoint challenges in `review/`. A challenge looks like
+a lesson without the teaching: `TASK_INSTRUCTION`, three hints, `check_task`,
+plus a `RECALLS` line naming the stages it spans.
 
 `run_game` walks `stages/stage*/stage.conf` in numeric order and stops at the
 first gap, so stages must be numbered contiguously. `tests/test_stages.sh`

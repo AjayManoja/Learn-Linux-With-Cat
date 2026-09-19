@@ -1,0 +1,10 @@
+Stage 8, {{PLAYER}}.
+
+Two questions this stage answers.
+
+How do I move a hundred files as one thing? You bundle them with tar,
+and squeeze them with gzip.
+
+How do I know nothing changed on the way? You take a fingerprint before
+and after, and compare. If the fingerprints match, the bytes match —
+and if they do not, diff will tell you exactly where.

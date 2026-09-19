@@ -15,6 +15,29 @@ source "$REPO_ROOT/src/engine/runner.sh"
 
 echo "Testing that lessons actually verify their task..."
 
+# A check that cannot even run looks exactly like a check that correctly
+# rejects: both return non-zero. `bash -n` does not catch it either, because
+# an =~ pattern is only parsed when the line executes — a bare space outside
+# parentheses ends the pattern and raises "syntax error in conditional
+# expression" at that moment. So call every check and read its stderr.
+check_runs_cleanly() {
+    local file="$1" label="$2" errors
+    errors=$( ( set +u
+                unset -f check_task check_mission
+                source "$file" 2>/dev/null
+                LAST_COMMAND="probe_command"
+                CURRENT_GAME_DIR="${SANDBOX_HOME:-/tmp}"
+                for fn in check_task check_mission; do
+                    type "$fn" >/dev/null 2>&1 && "$fn" >/dev/null
+                done ) 2>&1 ) || true
+
+    if grep -qE 'syntax error|command not found|unbound variable' <<< "$errors"; then
+        fail "$label check errors when run: $(head -1 <<< "$errors")"
+    else
+        pass "$label check runs without error"
+    fi
+}
+
 # The invariant: in a freshly built world, with a command that has nothing to
 # do with the lesson, no check_task may pass. A lesson that returns 0
 # regardless announces "Well done!" for whatever the player typed and moves on,
@@ -56,6 +79,7 @@ for stage_dir in "${stage_dirs[@]}"; do
             2) fail "$stage_id/$lesson_name defines no check_task" ;;
             *) pass "$stage_id/$lesson_name rejects an unrelated command" ;;
         esac
+        check_runs_cleanly "$lesson_file" "$stage_id/$lesson_name"
     done
 
     # Review challenges are questions, so passing one without answering is
@@ -80,6 +104,7 @@ for stage_dir in "${stage_dirs[@]}"; do
             2) fail "$stage_id/review/$challenge_name defines no check_task" ;;
             *) pass "$stage_id/review/$challenge_name rejects an unrelated command" ;;
         esac
+        check_runs_cleanly "$challenge_file" "$stage_id/review/$challenge_name"
 
         rerun_rc=0
         (
@@ -116,6 +141,7 @@ for stage_dir in "${stage_dirs[@]}"; do
             2) fail "$stage_id/$mission_name defines no check_mission" ;;
             *) pass "$stage_id/$mission_name starts incomplete" ;;
         esac
+        check_runs_cleanly "$mission_file" "$stage_id/$mission_name"
 
         # Setup must survive being run twice. A player who quits partway
         # through a mission runs it again on their next session, and a setup

@@ -130,30 +130,49 @@ sandbox_syntax_ok() {
     return 0
 }
 
-# Splits on unquoted pipes only, one segment per line.
+# Splits on unquoted command separators - | ; && || - one segment per line.
+# Stage 9 unlocks chaining, and a chained command is still a command: without
+# splitting on the separators too, "ls ; anything" would put the second half
+# beyond the allowlist's reach.
 split_unquoted_pipes() {
     local line="$1"
-    local i ch quote="" segment=""
+    local i ch quote="" segment="" prev=""
 
     for (( i = 0; i < ${#line}; i++ )); do
         ch="${line:i:1}"
 
+        if [[ "$prev" == "\\" ]]; then
+            segment+="$ch"
+            prev=""
+            continue
+        fi
+
         if [[ -n "$quote" ]]; then
             [[ "$ch" == "$quote" ]] && quote=""
             segment+="$ch"
+            prev="$ch"
             continue
         fi
 
         case "$ch" in
             "'"|'"') quote="$ch"; segment+="$ch" ;;
-            '|') printf '%s
-' "$segment"; segment="" ;;
+            '|'|';'|'&')
+                # A doubled && or || already ended the segment; drop the second
+                # character instead of starting a segment with it.
+                if [[ "$prev" == "$ch" ]]; then
+                    prev=""
+                    continue
+                fi
+                printf '%s\n' "$segment"
+                segment=""
+                ;;
             *) segment+="$ch" ;;
         esac
+
+        prev="$ch"
     done
 
-    printf '%s
-' "$segment"
+    printf '%s\n' "$segment"
 }
 
 # Rewrite the path the player sees onto the real sandbox directory.
@@ -167,7 +186,7 @@ sandbox_paths_ok() {
     local line="$1" tok resolved
     for tok in $line; do
         case "$tok" in
-            -*|'|'|'>'|'>>'|'<'|'&') continue ;;
+            -*|'|'|'>'|'>>'|'<'|'&'|';') continue ;;
             "$SANDBOX_HOME"*) continue ;;
             /*) return 1 ;;
             *..*)
@@ -541,9 +560,13 @@ run_lesson() {
         fi
     fi
 
-    # A lesson may require the player to be somewhere specific. Without this a
-    # lesson picks up wherever the last one — or the last mission — left them,
-    # which breaks its instructions and can make its check pass for free.
+    # Each lesson starts from home unless it says otherwise. Inheriting
+    # wherever the last lesson or mission left the player breaks instructions
+    # written as relative paths, and can make a check pass — or become
+    # impossible — for reasons the player cannot see.
+    ensure_current_dir_usable || true
+    CURRENT_GAME_DIR="$SANDBOX_HOME"
+
     if [[ -n "${LESSON_START_DIR:-}" ]]; then
         local start_dir="${SANDBOX_HOME}/${LESSON_START_DIR}"
         if [[ -d "$start_dir" ]]; then
@@ -726,6 +749,8 @@ run_review_challenge() {
     fi
 
     ensure_current_dir_usable || true
+    CURRENT_GAME_DIR="$SANDBOX_HOME"
+
     if [[ -n "${LESSON_START_DIR:-}" ]]; then
         local start_dir="${SANDBOX_HOME}/${LESSON_START_DIR}"
         [[ -d "$start_dir" ]] && CURRENT_GAME_DIR="$start_dir"

@@ -30,5 +30,5 @@ check_mission() {
     # setup_mission writes .mission_code itself, so testing for that file marked
     # the mission complete before the player had moved. Require them to actually
     # stand where the fish is instead.
-    check_current_dir "${HIDDEN_FISH_DIR}" && check_file_exists "${HIDDEN_FISH_DIR}/fish.txt"
+    check_current_dir "${HIDDEN_FISH_DIR:-}" && check_file_exists "${HIDDEN_FISH_DIR:-}/fish.txt"
 }

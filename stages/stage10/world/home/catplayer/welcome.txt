@@ -1,0 +1,10 @@
+The last stage, {{PLAYER}}.
+
+There is almost nothing new here. Four small commands, and then you
+build things.
+
+Everything from here is combination: find feeding xargs, grep feeding
+awk, a loop wrapped in a script with an argument and a check that the
+argument was actually given.
+
+That is what a Linux user does all day. You are about to do it.

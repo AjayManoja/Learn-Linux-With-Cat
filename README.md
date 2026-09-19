@@ -19,17 +19,17 @@
 ## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/<you>/learn-linux-with-cat.git
-cd learn-linux-with-cat
+git clone https://github.com/AjayManoja/Learn-Linux-With-Cat.git
+cd Learn-Linux-With-Cat
 chmod +x start.sh
 ./start.sh
 ```
 
-**Or with Docker 🐳**
+**Or with Docker 🐳** — the simplest option on Windows:
 
 ```bash
 docker build -t catgame .
-docker run -it catgame
+docker run -it --rm catgame
 ```
 
 ---
@@ -71,12 +71,24 @@ actual scripts.
 ## 🧪 Running the Tests
 
 ```bash
-bash tests/run_all.sh          # everything
+bash tests/run_all.sh          # everything (exits non-zero on any failure)
+bash tests/test_lessons.sh     # no lesson can pass without doing the task
 bash tests/test_stages.sh      # every stage's content is present and loadable
+bash tests/test_safety.sh      # sandbox escape, command gates, rm, kill
 ```
 
-The suite exits non-zero if any assertion fails, and never touches your real
-progress or sandbox.
+Each test file builds a throwaway `GAME_ROOT`, so running the suite never
+touches your progress or your sandbox.
+
+Two invariants are worth knowing about, because breaking either one makes the
+game feel finished when it isn't:
+
+- **No lesson or mission may pass in a fresh world given an unrelated command.**
+  A check that returns success unconditionally prints "Well done!" for whatever
+  the player typed and moves on, which is indistinguishable from the game being
+  broken. `test_lessons.sh` enforces this for every lesson in every stage.
+- **Every mission must be winnable.** `test_missions.sh` asserts each one starts
+  incomplete and finishes via the steps its own briefing describes.
 
 ---
 
@@ -151,7 +163,8 @@ pwd → ls + pwd → cd + pwd → cd + ls + pwd → cd + ls -la + cat → 🧩 M
   refused outside quotes, so they cannot route around the command gate
 - ☠️ `kill` reaches only processes the game itself started — never your own
   shell or editor
-- ♻️ Stage 1: deleted files go to Cat's Trash Bin (recoverable)
+- ♻️ `rm` moves files to Cat's Trash Bin (`.cat_trash`) instead of deleting
+  them, so a mistake is recoverable
 - 🚫 Dangerous commands (`rm -rf /`, `sudo`, `wget`, etc.) are blocked
 - 🐳 Docker option for full isolation
 
@@ -218,6 +231,7 @@ learn-linux-with-cat/
     ├── test_checker.sh   ✅ Task verification library
     ├── test_safety.sh    🛡️ Command gates, sandbox escape, kill gate
     ├── test_missions.sh  🧩 Every mission is actually winnable
+    ├── test_lessons.sh   🎯 No lesson passes without doing the task
     ├── test_stage1.sh    🌍 Sandbox build + world population
     └── test_stages.sh    📋 Every stage loads and is complete
 ```
@@ -246,6 +260,23 @@ first gap, so stages must be numbered contiguously. `tests/test_stages.sh`
 checks that for you.
 
 The engine discovers stages via `stages/*/stage.conf`. Stage numbering determines order. Progress tracking handles transitions automatically.
+
+---
+
+## 💾 Progress
+
+Progress is saved to `.catgame_progress` after every lesson and mission. Quit
+with `quit` and the next session picks up at the next unfinished lesson rather
+than replaying the stage.
+
+| Key | Meaning |
+|-----|---------|
+| `CURRENT_STAGE` | Stage you are on |
+| `COMPLETED_LESSONS` | Finished lessons, as `stage<N>:<id>` |
+| `COMPLETED_MISSIONS` | Finished missions |
+| `SANDBOX_STAGE` | Which stage's world the sandbox currently holds |
+
+`./reset.sh` clears progress and the sandbox and starts you over.
 
 ---
 

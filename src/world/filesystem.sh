@@ -104,7 +104,11 @@ generate_system_log() {
     
     local i
     for (( i=1; i<=num_lines; i++ )); do
-        local timestamp="2024-03-15 0$(($RANDOM % 9 + 1)):$((RANDOM % 59 + 10)):$((RANDOM % 59 + 10))"
+        # Minutes and seconds were "% 59 + 10", which produced values up to 68
+        # — timestamps like 02:63:65 in a file the player is being taught to
+        # read as a real log.
+        local timestamp
+        timestamp=$(printf '2024-03-15 %02d:%02d:%02d'             "$((RANDOM % 24))" "$((RANDOM % 60))" "$((RANDOM % 60))")
         local level="INFO"
         local message="Normal system operation"
         

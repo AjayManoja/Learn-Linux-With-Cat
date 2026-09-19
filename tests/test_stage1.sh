@@ -30,6 +30,11 @@ assert_path_exists "hidden .bashrc generated for ls -la"      "$SANDBOX_HOME/.ba
 assert_ok "secret line hidden in system.log" \
     grep -q "Secret door" "$SANDBOX_HOME/system.log"
 
+# The log is teaching material: a player learning to read timestamps should
+# not be shown 02:63:65.
+bad_times="$(grep -cE '[0-9]{2}:(6[0-9]|[7-9][0-9]):|:(6[0-9]|[7-9][0-9])\]' "$SANDBOX_HOME/system.log" 2>/dev/null || true)"
+assert_eq "system.log timestamps are all valid times" "0" "$bad_times"
+
 # The 'less' lesson is only worth playing if the log is long enough to scroll.
 log_lines="$(wc -l < "$SANDBOX_HOME/system.log")"
 if [[ "$log_lines" -gt 100 ]]; then

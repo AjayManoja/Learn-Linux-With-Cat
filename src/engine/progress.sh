@@ -86,6 +86,19 @@ player_slug() {
     printf '%s' "${slug:-catplayer}"
 }
 
+# Where one player's typed commands are kept between sessions, beside their
+# save, so switching profiles switches the history behind ↑ with it. The
+# legacy single-save path is not a ".progress" file, so it is named here
+# rather than derived — deriving it would have written the history over the
+# save itself.
+player_history_file() {
+    if [[ "$PROGRESS_FILE" == *.progress ]]; then
+        printf '%s' "${PROGRESS_FILE%.progress}.history"
+    else
+        printf '%s' "${PROGRESS_DIR}/catplayer.history"
+    fi
+}
+
 # Point the save file at one player's own profile and load it. Returns 0 if
 # that player has played before (so the caller can welcome them back), 1 if
 # this is a new profile.

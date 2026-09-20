@@ -10,6 +10,8 @@ source "$GAME_ROOT/src/ui/cat.sh"
 source "$GAME_ROOT/src/ui/box.sh"
 source "$GAME_ROOT/src/ui/banner.sh"
 source "$GAME_ROOT/src/engine/progress.sh"
+# After progress.sh: the command history lives beside the player's save.
+source "$GAME_ROOT/src/engine/history.sh"
 source "$GAME_ROOT/src/engine/hints.sh"
 # sandbox.sh first: it decides where the sandbox lives, and safety.sh and
 # checker.sh both resolve their paths against that.
@@ -37,7 +39,10 @@ if [[ -n "$known_players" ]]; then
     done <<< "$known_players"
     echo "Type one of those to carry on, or any other name to start fresh."
 fi
-read -p "🐱 What's your name, adventurer? [catplayer]: " player_input
+# Line editing on before the first thing the player types: without it an
+# arrow key here is four stray characters in their own name.
+init_line_editing
+read_line "🐱 What's your name, adventurer? [catplayer]: " player_input
 PLAYER_NAME="${player_input:-catplayer}"
 export PLAYER_NAME
 
@@ -49,6 +54,10 @@ if select_player_profile "$PLAYER_NAME"; then
 else
     returning_player=false
 fi
+
+# Their own history now that their profile is known, so the commands behind
+# ↑ are the ones this player typed last time.
+init_command_history
 
 # The sandbox is built per stage by run_game, which knows which world each
 # stage needs.

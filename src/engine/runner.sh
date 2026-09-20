@@ -489,10 +489,15 @@ interactive_prompt() {
             display_dir="~/${display_dir}"
         fi
 
-        echo -ne "${GREEN}${PLAYER_NAME:-catplayer}@linux${RESET}:${BLUE}${display_dir}${RESET}\$ "
+        # Built through prompt_color so readline knows which parts of it
+        # print nothing; read_line prints it, because the line editor has to
+        # own the prompt to redraw it when ↑ recalls a longer command.
+        local prompt
+        prompt="$(prompt_color "$GREEN")${PLAYER_NAME:-catplayer}@linux$(prompt_color "$RESET")"
+        prompt+=":$(prompt_color "$BLUE")${display_dir}$(prompt_color "$RESET")\$ "
 
         local input=""
-        if read -t 60 -r input; then
+        if read_line "$prompt" input 60; then
             # Trim surrounding whitespace. This used to go through xargs,
             # which also strips quotes and re-splits words: typing
             #   echo '#!/usr/bin/env bash' > script.sh
@@ -506,6 +511,10 @@ interactive_prompt() {
             fi
 
             LAST_COMMAND="$input"
+            # Everything typed here goes behind ↑, game commands included:
+            # this is the player's shell, and `hint` is as worth recalling
+            # as `ls -la`.
+            remember_command "$input"
 
             case "$input" in
                 hint)
@@ -801,8 +810,13 @@ ask_question() {
     local answered=false
 
     while [[ "$answered" == false ]]; do
-        echo -ne "${GREEN}your answer${RESET} (or 'hint', or 'answer' to reveal): "
-        if ! read -r answer; then
+        # Same line editor as the command prompt: a sentence typed here is
+        # the longest thing the game ever asks for, and it is the one place
+        # a typo three words back used to mean retyping the lot.
+        local answer_prompt
+        answer_prompt="$(prompt_color "$GREEN")your answer$(prompt_color "$RESET")"
+        answer_prompt+=" (or 'hint', or 'answer' to reveal): "
+        if ! read_line "$answer_prompt" answer; then
             # Input ended (piped session); reveal and move on rather than spin.
             break
         fi

@@ -265,6 +265,7 @@ Learn-Linux-With-Cat/
 │   │   ├── progress.sh   💾 Per-player save/load
 │   │   ├── cheat.sh      ⏩ cheatcode stage picker
 │   │   ├── hints.sh      💡 3-tier hint system
+│   │   ├── history.sh    ↑ Line editing and command recall
 │   │   └── safety.sh     🛡️ Command safety filter
 │   │
 │   ├── ui/
@@ -393,6 +394,14 @@ player whose name is in it the first time they play.
 | `progress` | Check your current position |
 | `cheatcode` | Jump straight to any stage (see below) |
 | `quit` | Save progress and exit |
+
+### ⌨️ At the prompt
+
+The prompt is a real line editor. **↑** and **↓** walk back through the
+commands you have already typed, **←**/**→**, Home and End move around the
+line, and the usual `Ctrl-A`/`Ctrl-E`/`Ctrl-U` keys work. Your history is
+saved with your progress, per player, so last session's commands are still
+behind ↑ when you come back.
 
 ### ⏩ cheatcode — jump to any stage
 

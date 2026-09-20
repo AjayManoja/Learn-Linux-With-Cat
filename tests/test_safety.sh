@@ -29,6 +29,7 @@ assert_ok    "ls allowed"            check_safety "ls -la"
 assert_ok    "cd allowed"            check_safety "cd Documents"
 assert_ok    "cat allowed"           check_safety "cat notes.txt"
 
+source "$REPO_ROOT/src/engine/history.sh"
 # Staying inside the sandbox is enforced by the cd handler, not the blocklist,
 # so it has to be exercised where it actually lives.
 source "$REPO_ROOT/src/engine/runner.sh"

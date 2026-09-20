@@ -7,6 +7,7 @@ source "$REPO_ROOT/src/ui/colors.sh"
 source "$REPO_ROOT/src/ui/cat.sh"
 source "$REPO_ROOT/src/ui/box.sh"
 source "$REPO_ROOT/src/engine/progress.sh"
+source "$REPO_ROOT/src/engine/history.sh"
 source "$REPO_ROOT/src/engine/runner.sh"
 source "$REPO_ROOT/src/engine/cheat.sh"
 

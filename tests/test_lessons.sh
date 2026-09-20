@@ -10,6 +10,7 @@ source "$REPO_ROOT/src/engine/checker.sh"
 source "$REPO_ROOT/src/engine/hints.sh"
 source "$REPO_ROOT/src/ui/colors.sh"
 source "$REPO_ROOT/src/ui/cat.sh"
+source "$REPO_ROOT/src/engine/history.sh"
 # runner.sh supplies the background-job helpers some missions set up with.
 source "$REPO_ROOT/src/engine/runner.sh"
 

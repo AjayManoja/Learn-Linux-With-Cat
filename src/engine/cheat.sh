@@ -50,58 +50,14 @@ list_stage_numbers() {
     done
 }
 
-# ── Key input ──────────────────────────────────────────────
-
-# One keypress, as a word. Arrow keys arrive as an escape sequence, so a bare
-# Esc is only known to be bare once nothing follows it — hence the timeout.
-read_menu_key() {
-    local key rest=""
-
-    IFS= read -rsn1 key || { printf 'cancel'; return 0; }
-
-    case "$key" in
-        '')
-            # read -n1 strips the newline, so Enter arrives as nothing at all.
-            printf 'enter'
-            ;;
-        $'\e')
-            IFS= read -rsn2 -t 0.05 rest || rest=""
-            case "$rest" in
-                '[A') printf 'up' ;;
-                '[B') printf 'down' ;;
-                '')   printf 'cancel' ;;
-                *)    printf 'other' ;;
-            esac
-            ;;
-        k|K|w|W) printf 'up' ;;
-        j|J|s|S) printf 'down' ;;
-        q|Q)     printf 'cancel' ;;
-        *)       printf 'other' ;;
-    esac
-}
-
 # ── Menu drawing ───────────────────────────────────────────
 
-# The alternate screen keeps the menu from scrolling the game away, and gives
-# the session back exactly as it was on the way out. The screen is cleared
-# once, here, and never again — see menu_line.
-cheat_menu_enter() { printf '\e[?1049h\e[?25l\e[H\e[2J'; }
-cheat_menu_leave() { printf '\e[?25h\e[?1049l'; }
+# read_menu_key, menu_line and the alternate screen live in src/ui/menu.sh —
+# the title screen's player list is drawn with the same pieces.
 
-# The row the cursor is about to write, and the row the stage list starts on.
-# Tracked while drawing so the repaint can address a single row directly,
-# instead of the whole frame.
-MENU_ROW=1
+# The row the stage list starts on. Tracked while drawing so the repaint can
+# address a single row directly, instead of the whole frame.
 MENU_LIST_ROW=1
-
-# One line of the menu, overwriting whatever the last frame left on that row.
-# Erasing to the end of the line is what replaces clearing the screen: a
-# cleared screen between frames is exactly what made the list appear to
-# reload every time the cursor moved.
-menu_line() {
-    printf '%b\e[K\n' "$1"
-    MENU_ROW=$((MENU_ROW + 1))
-}
 
 # How many stages fit on screen, leaving room for the header and footer.
 cheat_menu_capacity() {
@@ -149,8 +105,7 @@ draw_cheat_menu() {
     local total="${#stages[@]}"
     local i
 
-    printf '\e[H'
-    MENU_ROW=1
+    menu_home
 
     menu_line "${MAGENTA}${BOLD}"
     menu_line "$(draw_dashed_line 52)"
@@ -296,10 +251,10 @@ choose_stage() {
     MENU_FIRST=0
     ((MENU_SELECTED >= MENU_VISIBLE)) && MENU_FIRST=$((MENU_SELECTED - MENU_VISIBLE + 1))
 
-    cheat_menu_enter
+    menu_screen_enter
     # Ctrl-C here must not leave the terminal on the alternate screen with no
     # cursor — the player would be typing blind into what looks like the menu.
-    trap 'cheat_menu_leave; exit 130' INT
+    trap 'menu_screen_leave; save_progress; exit 130' INT
 
     draw_cheat_menu "$MENU_SELECTED" "$MENU_FIRST" "$MENU_VISIBLE" "${stages[@]}"
 
@@ -318,8 +273,9 @@ choose_stage() {
         fi
     done
 
-    trap - INT
-    cheat_menu_leave
+    # Back to the game's own handler, which writes the save before it goes.
+    install_save_traps
+    menu_screen_leave
 
     [[ "$key" == "enter" ]] || return 1
     CHEAT_CHOICE="${stages[MENU_SELECTED]}"

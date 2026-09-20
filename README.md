@@ -256,7 +256,6 @@ Learn-Linux-With-Cat/
 ├── check.sh              ✅ Mission code verifier
 ├── Dockerfile            🐳 Docker sandbox
 ├── README.md
-├── LICENSE
 │
 ├── src/
 │   ├── engine/
@@ -264,6 +263,7 @@ Learn-Linux-With-Cat/
 │   │   ├── checker.sh    ✅ Task verification library
 │   │   ├── progress.sh   💾 Per-player save/load
 │   │   ├── cheat.sh      ⏩ cheatcode stage picker
+│   │   ├── players.sh    👥 Title screen: new, rename, delete
 │   │   ├── hints.sh      💡 3-tier hint system
 │   │   ├── history.sh    ↑ Line editing and command recall
 │   │   └── safety.sh     🛡️ Command safety filter
@@ -272,7 +272,8 @@ Learn-Linux-With-Cat/
 │   │   ├── cat.sh        🐱 Dynamic cat pose system
 │   │   ├── colors.sh     🎨 ANSI color definitions
 │   │   ├── box.sh        📦 Lesson/mission box renderer
-│   │   └── banner.sh     🏠 Welcome & stage banners
+│   │   ├── banner.sh     🏠 Welcome & stage banners
+│   │   └── menu.sh       ⌨️  Arrow-key list, shared by both menus
 │   │
 │   └── world/
 │       ├── sandbox.sh    🏗️ Sandbox management
@@ -360,18 +361,55 @@ The engine discovers stages via `stages/*/stage.conf`. Stage numbering determine
 
 ---
 
+## 👥 Players
+
+The title screen is the list of everyone with a save here, newest first, and
+how far each of them got:
+
+```
+--------------------------------------------------------------
+  WHO IS PLAYING?
+--------------------------------------------------------------
+  up/down move   enter play   n new   r rename   d delete   q quit
+
+->  🐾 Ada Lovelace       Stage 7 · 24 lessons · 2 hours ago
+    🐾 catplayer          Stage 1 · 3 lessons · yesterday
+    + new adventurer       start a fresh save
+--------------------------------------------------------------
+```
+
+| Key | What it does |
+|-----|--------------|
+| ↑ ↓ | Move through the list |
+| Enter | Play that save — or start one, on the last row |
+| `n` | New adventurer |
+| `r` | Rename the selected one; save and command history move with it |
+| `d` | Delete the selected one, after a confirmation. There is no undo |
+| `q` | Quit without playing |
+
+Each player gets their own save, in `.catgame/<name>.progress`, and their own
+command history beside it. Capitalisation and spacing do not matter —
+`Ada Lovelace` and `ada_lovelace` are the same adventurer. A save from before
+this was per-player (`.catgame_progress`) is handed to the player whose name
+is in it the first time they play.
+
+With no terminal to draw on — `docker run` without `-t`, a script piping
+input in — the same list is printed with numbers and the rest is typed:
+`2`, a name, `rename 2 Ada`, `delete 2`, `quit`.
+
+---
+
 ## 💾 Progress
 
-Progress is saved after every lesson, mission and checkpoint challenge. Quit
-with `quit` and the next session picks up at the next unfinished item rather
-than replaying the stage.
+Progress is saved after every lesson, mission and checkpoint challenge, after
+every command typed at the prompt, and again on the way out — whether that is
+`quit`, Ctrl-C, the terminal window closing, or the machine shutting down
+underneath the game. An interrupted session costs you the command you were
+typing, not the lesson you were in.
 
-Each player gets their own save, in `.catgame/<name>.progress`. The name you
-type at the title screen chooses it: a name that has played before resumes
-where it left off, a new one starts at Stage 1. Capitalisation and spacing
-do not matter — `Ada Lovelace` and `ada_lovelace` are the same adventurer.
-A save from before this was per-player (`.catgame_progress`) is handed to the
-player whose name is in it the first time they play.
+The save is written to a temporary file and renamed over the old one, which
+is a single atomic step: a crash in the middle of a save leaves the previous
+save whole rather than half of a new one.
 
 | Key | Meaning |
 |-----|---------|
@@ -380,6 +418,7 @@ player whose name is in it the first time they play.
 | `COMPLETED_MISSIONS` | Finished missions |
 | `COMMANDS_PRACTICED` | The command each finished lesson taught (`help` shows it) |
 | `SANDBOX_STAGE` | Which stage's world the sandbox currently holds |
+| `LAST_PLAYED` | When the save was last written — what the title screen orders by |
 
 `./reset.sh` clears the sandbox and every player's progress, and starts over.
 
@@ -497,12 +536,6 @@ Before opening a PR, run `bash tests/run_all.sh`. It will tell you if a lesson
 can be passed without doing the task, if a mission is unwinnable, if a check
 errors instead of rejecting, or if you have left a gap in the stage numbering
 that the game would stop at.
-
----
-
-## 📜 License
-
-MIT License — see [LICENSE](LICENSE)
 
 ---
 

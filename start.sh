@@ -9,9 +9,12 @@ source "$GAME_ROOT/src/ui/colors.sh"
 source "$GAME_ROOT/src/ui/cat.sh"
 source "$GAME_ROOT/src/ui/box.sh"
 source "$GAME_ROOT/src/ui/banner.sh"
+source "$GAME_ROOT/src/ui/menu.sh"
 source "$GAME_ROOT/src/engine/progress.sh"
-# After progress.sh: the command history lives beside the player's save.
+# Both after progress.sh: the command history lives beside the player's save,
+# and the title screen is those profile operations with a list drawn over them.
 source "$GAME_ROOT/src/engine/history.sh"
+source "$GAME_ROOT/src/engine/players.sh"
 source "$GAME_ROOT/src/engine/hints.sh"
 # sandbox.sh first: it decides where the sandbox lives, and safety.sh and
 # checker.sh both resolve their paths against that.
@@ -28,22 +31,15 @@ source "$GAME_ROOT/src/world/filesystem.sh"
 # Show welcome
 show_welcome_banner
 
-# Ask for player name
-echo ""
-known_players="$(list_player_profiles)"
-if [[ -n "$known_players" ]]; then
-    echo "Adventurers with a save here:"
-    # A name can contain spaces, so read it a line at a time.
-    while IFS= read -r saved_name; do
-        printf '   🐾 %s\n' "$saved_name"
-    done <<< "$known_players"
-    echo "Type one of those to carry on, or any other name to start fresh."
-fi
 # Line editing on before the first thing the player types: without it an
 # arrow key here is four stray characters in their own name.
 init_line_editing
-read_line "🐱 What's your name, adventurer? [catplayer]: " player_input
-PLAYER_NAME="${player_input:-catplayer}"
+
+# Who is playing: the saves that exist, and the new, rename and delete that
+# go with them. Comes back with the name in PLAYER_CHOICE, or exits the game
+# if nobody is playing after all.
+player_title_screen
+PLAYER_NAME="$PLAYER_CHOICE"
 export PLAYER_NAME
 
 # Load this player's own save. Each name keeps its own progress: loading
@@ -54,6 +50,11 @@ if select_player_profile "$PLAYER_NAME"; then
 else
     returning_player=false
 fi
+
+# From here on the save is written on the way out, whichever way out it is:
+# quitting, Ctrl-C, the terminal window closing, or Ubuntu sending everything
+# a TERM as it shuts down.
+install_save_traps
 
 # Their own history now that their profile is known, so the commands behind
 # ↑ are the ones this player typed last time.

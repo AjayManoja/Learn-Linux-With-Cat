@@ -474,6 +474,11 @@ execute_in_sandbox() {
 
 # ── Interactive Prompt ─────────────────────────────────────
 
+# How long the prompt waits before the cat asks whether anyone is still
+# there. A minute was short enough to interrupt someone still reading the
+# lesson they were halfway through.
+IDLE_PROMPT_SECONDS=240
+
 interactive_prompt() {
     local task_complete=false
     # Track last command for the checker
@@ -497,7 +502,7 @@ interactive_prompt() {
         prompt+=":$(prompt_color "$BLUE")${display_dir}$(prompt_color "$RESET")\$ "
 
         local input=""
-        if read_line "$prompt" input 60; then
+        if read_line "$prompt" input "$IDLE_PROMPT_SECONDS"; then
             # Trim surrounding whitespace. This used to go through xargs,
             # which also strips quotes and re-splits words: typing
             #   echo '#!/usr/bin/env bash' > script.sh
@@ -577,8 +582,14 @@ interactive_prompt() {
                     fi
                     ;;
             esac
+
+            # The save is brought up to date after every command, so an
+            # interrupted session costs the player the command they were
+            # typing rather than the lesson they were in. It writes only
+            # when something has actually changed since the last one.
+            autosave_progress
         else
-            # 60-second timeout — player is idle
+            # Nothing typed for IDLE_PROMPT_SECONDS — the player is idle
             echo ""
             show_cat "sleeping" "Zzz... Are you still there? Type a command!"
             echo ""

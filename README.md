@@ -262,7 +262,8 @@ Learn-Linux-With-Cat/
 │   ├── engine/
 │   │   ├── runner.sh     🎮 Game loop (data-driven, stage-agnostic)
 │   │   ├── checker.sh    ✅ Task verification library
-│   │   ├── progress.sh   💾 Save/load progress
+│   │   ├── progress.sh   💾 Per-player save/load
+│   │   ├── cheat.sh      ⏩ cheatcode stage picker
 │   │   ├── hints.sh      💡 3-tier hint system
 │   │   └── safety.sh     🛡️ Command safety filter
 │   │
@@ -360,19 +361,26 @@ The engine discovers stages via `stages/*/stage.conf`. Stage numbering determine
 
 ## 💾 Progress
 
-Progress is saved to `.catgame_progress` after every lesson, mission and
-checkpoint challenge. Quit with `quit` and the next session picks up at the
-next unfinished item rather than replaying the stage.
+Progress is saved after every lesson, mission and checkpoint challenge. Quit
+with `quit` and the next session picks up at the next unfinished item rather
+than replaying the stage.
+
+Each player gets their own save, in `.catgame/<name>.progress`. The name you
+type at the title screen chooses it: a name that has played before resumes
+where it left off, a new one starts at Stage 1. Capitalisation and spacing
+do not matter — `Ada Lovelace` and `ada_lovelace` are the same adventurer.
+A save from before this was per-player (`.catgame_progress`) is handed to the
+player whose name is in it the first time they play.
 
 | Key | Meaning |
 |-----|---------|
 | `CURRENT_STAGE` | Stage you are on |
 | `COMPLETED_LESSONS` | Finished lessons, as `stage<N>:<id>` |
 | `COMPLETED_MISSIONS` | Finished missions |
-| `COMMANDS_PRACTICED` | Everything you have typed at least once (`help` shows it) |
+| `COMMANDS_PRACTICED` | The command each finished lesson taught (`help` shows it) |
 | `SANDBOX_STAGE` | Which stage's world the sandbox currently holds |
 
-`./reset.sh` clears progress and the sandbox and starts you over.
+`./reset.sh` clears the sandbox and every player's progress, and starts over.
 
 ---
 
@@ -383,7 +391,38 @@ next unfinished item rather than replaying the stage.
 | `hint` | Get progressive help (3 levels) |
 | `help` | Show commands you've learned |
 | `progress` | Check your current position |
+| `cheatcode` | Jump straight to any stage (see below) |
 | `quit` | Save progress and exit |
+
+### ⏩ cheatcode — jump to any stage
+
+Fifteen stages is a long walk to reach the one you are working on. Type
+`cheatcode` at any prompt and an arrow-key list of every stage opens:
+
+```
+----------------------------------------------------
+  CHEAT CODE - jump straight to any stage
+----------------------------------------------------
+  up/down move    enter jump    q cancel
+
+    5. [✓] Cat's First Script
+    6. [ ] Text Surgery   <- you are here
+->  7. [ ] Finding and Measuring
+    8. [ ] Archives and Integrity
+```
+
+Move with the arrow keys (or `j`/`k`), press Enter to jump, `q` to back out.
+`[✓]` marks a stage you have finished.
+
+The jump is real, not a fake: the sandbox is rebuilt for the stage you land
+on, and every command taught by the stages you skipped is unlocked, so the
+new stage's lessons have the vocabulary they are built on. Nothing you did
+not play is marked complete — skipped stages stay unticked, and `quit` saves
+you where you landed. Picking a stage you have already finished offers to
+clear its record so it can be played again.
+
+It exists so a new stage can be tested without replaying the fourteen before
+it, but nothing stops a player using it. It is not hidden.
 
 ---
 

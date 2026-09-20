@@ -1,5 +1,6 @@
 sandbox/
 .catgame_progress
+.catgame/
 .mission_code
 *.swp
 *.swo

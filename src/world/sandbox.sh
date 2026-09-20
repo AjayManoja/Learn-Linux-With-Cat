@@ -90,6 +90,22 @@ create_sandbox() {
     
     # Replace {{PLAYER}} placeholders with actual player name
     find "${SANDBOX_ROOT}" -type f -exec sed -i "s/{{PLAYER}}/${player_name}/g" {} +
+
+    # Written after the substitution pass so it is not rewritten by it. See
+    # sandbox_owned_by.
+    printf '%s\n' "${player_name}" > "${SANDBOX_ROOT}/.sandbox_owner"
+}
+
+# Whether the sandbox on disk was built for this player. The sandbox lives at
+# one path per checkout while saves are per player, so a stage number alone
+# does not say the world is theirs.
+sandbox_owned_by() {
+    local want="${1:-catplayer}" owner
+    local marker="${SANDBOX_ROOT}/.sandbox_owner"
+
+    [[ -f "$marker" ]] || return 1
+    owner="$(head -1 "$marker")"
+    [[ "$owner" == "$want" ]]
 }
 
 destroy_sandbox() {

@@ -516,10 +516,19 @@ interactive_prompt() {
                     show_cat "sad" "Progress saved. See you next time! 🐾"
                     exit 0
                     ;;
+                cheatcode|cheat)
+                    cheat_code_menu
+                    if jump_requested; then
+                        # Unwind out of the lesson; run_game does the jump.
+                        return 0
+                    fi
+                    ;;
                 help)
                     echo ""
-                    echo "Commands you've learned: $(get_learned_commands)"
-                    echo "Game commands: hint, help, progress, quit"
+                    local learned
+                    learned="$(get_learned_commands)"
+                    echo "Commands you've learned: ${learned:-(none yet — finish this lesson to earn one!)}"
+                    echo "Game commands: hint, help, progress, cheatcode, quit"
                     echo ""
                     ;;
                 progress)
@@ -539,10 +548,10 @@ interactive_prompt() {
                     # Execute the command in sandbox
                     execute_in_sandbox "$input" || true
 
-                    # Track the base command as learned
-                    local base_cmd
-                    base_cmd=$(echo "$input" | awk '{print $1}')
-                    add_learned_command "$base_cmd"
+                    # Nothing is recorded as learned here. Taking the
+                    # first word of whatever was typed made `help` print the
+                    # player's shell history — typos included. run_lesson
+                    # records the command the lesson taught instead.
 
                     # Check if the current task is complete
                     if type check_task &>/dev/null; then
@@ -629,6 +638,10 @@ run_lesson() {
     # Enter interactive mode until task is complete
     interactive_prompt
 
+    # A cheatcode jump leaves the lesson unfinished on purpose: the player
+    # never did it, so nothing here should record that they did.
+    jump_requested && return 0
+
     # Mark lesson done
     mark_lesson_complete "$lesson_id"
     add_learned_command "${LESSON_COMMAND:-}"
@@ -695,6 +708,8 @@ run_mission() {
     # Enter free exploration mode
     interactive_prompt
 
+    jump_requested && return 0
+
     # Missions send the player wandering. The next lesson expects to start at
     # home, so put them back rather than leaving them wherever they finished.
     CURRENT_GAME_DIR="$SANDBOX_HOME"
@@ -737,6 +752,7 @@ run_section() {
         CURRENT_LESSON="$lesson_id"
         save_progress
         run_lesson "$lesson_id"
+        jump_requested && return 0
     done
 
     # Run section mission if defined
@@ -744,6 +760,7 @@ run_section() {
     local mission_id="${!mission_var:-}"
     if [[ -n "$mission_id" ]] && ! mission_is_complete "$mission_id"; then
         run_mission "$mission_id"
+        jump_requested && return 0
     fi
 
     mark_section_complete "$section"
@@ -803,6 +820,13 @@ ask_question() {
             answer|skip|reveal)
                 break
                 ;;
+            cheatcode|cheat)
+                cheat_code_menu
+                # Leave before the model answer is shown and the question is
+                # marked done: the player is not answering it, they are gone.
+                jump_requested && return 0
+                continue
+                ;;
         esac
 
         attempts=$((attempts + 1))
@@ -848,6 +872,7 @@ run_quiz() {
 
     for question_id in $remaining; do
         ask_question "$question_id"
+        jump_requested && return 0
     done
 
     echo ""
@@ -908,6 +933,8 @@ run_review_challenge() {
 
     interactive_prompt
 
+    jump_requested && return 0
+
     mark_lesson_complete "review:${challenge_id}"
 }
 
@@ -931,6 +958,7 @@ run_review() {
 
     for challenge_id in $remaining; do
         run_review_challenge "$challenge_id"
+        jump_requested && return 0
     done
 
     echo ""
@@ -960,6 +988,7 @@ run_stage() {
         for section in $STAGE_SECTIONS; do
             CURRENT_SECTION="$section"
             run_section "$section"
+            jump_requested && return 0
         done
     fi
 
@@ -967,7 +996,9 @@ run_stage() {
     # commands alongside this one's, and the questions ask whether the player
     # can say out loud what the stage just showed them.
     run_review
+    jump_requested && return 0
     run_quiz
+    jump_requested && return 0
 
     # Run the final mission if defined
     if [[ -n "${FINAL_MISSION:-}" ]] && ! mission_is_complete "$FINAL_MISSION"; then
@@ -975,6 +1006,7 @@ run_stage() {
         show_cat "mission" "One last challenge awaits..."
         echo ""
         run_mission "$FINAL_MISSION"
+        jump_requested && return 0
     fi
 
     # Stage complete!
@@ -993,7 +1025,11 @@ stage_exists() {
 prepare_stage_world() {
     local stage_num="$1"
 
-    if [[ "${SANDBOX_STAGE:-}" == "$stage_num" ]] && sandbox_exists; then
+    # Players share one sandbox directory, so reusing it needs both the right
+    # stage and the right owner: otherwise the next player to reach a stage
+    # someone else left mid-way inherits their files.
+    if [[ "${SANDBOX_STAGE:-}" == "$stage_num" ]] && sandbox_exists \
+        && sandbox_owned_by "${PLAYER_NAME:-catplayer}"; then
         return 0
     fi
 
@@ -1017,6 +1053,19 @@ run_game() {
     while stage_exists "$stage_num"; do
         prepare_stage_world "$stage_num"
         run_stage "$stage_num"
+
+        if jump_requested; then
+            stage_num="$STAGE_JUMP_TARGET"
+            STAGE_JUMP_TARGET=""
+            # The jump skipped the stages in between, so their vocabulary has
+            # to be unlocked as if they had been played — otherwise half the
+            # commands the new stage builds on are refused.
+            unlock_prior_commands "$stage_num"
+            CURRENT_STAGE="$stage_num"
+            CURRENT_SECTION="A"
+            save_progress
+            continue
+        fi
 
         stage_num=$((stage_num + 1))
 

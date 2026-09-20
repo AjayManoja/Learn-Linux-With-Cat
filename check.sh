@@ -20,7 +20,9 @@ if [[ -f "$code_file" ]]; then
     actual_code=$(cat "$code_file")
     if [[ "$provided_code" == "$actual_code" ]]; then
         show_cat "celebrate" "You found the correct code! Mission accomplished! 🏆"
-        load_progress
+        # Credit the player whose session is running, not whichever save
+        # happens to be first on disk.
+        select_last_player_profile
         mark_stage_complete "$CURRENT_STAGE"
         echo ""
         echo "Stage $CURRENT_STAGE complete! Your progress has been saved."

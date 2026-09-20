@@ -24,6 +24,29 @@ show_task_box() {
   echo -e "✅  ${BOLD}${instruction}${RESET}"
 }
 
+# The shape of the command a lesson just explained: what to type, with the
+# parts you fill in yourself in capitals, and a worked example or two.
+# src/engine/formats.sh builds the body; a lesson that teaches an idea rather
+# than a command has none, and then nothing is drawn.
+show_format_box() {
+  local body="${1:-}"
+  local width=68
+  [[ -n "$body" ]] || return 0
+
+  # The legend is about the shape, which is the first line: "pwd" needs no
+  # explaining, "head [-n NUMBER] FILE" does.
+  local shape="${body%%$'\n'*}"
+
+  echo -e "${CYAN}📐  HOW TO WRITE IT${RESET}"
+  draw_dashed_line "${width}"
+  printf '%s\n' "$body"
+  if [[ "$shape" == *'['* || "$shape" =~ [A-Z][A-Z] ]]; then
+    echo ""
+    echo -e "${DIM}  CAPITALS = put your own word there   [ ] = can be left out${RESET}"
+  fi
+  draw_dashed_line "${width}"
+}
+
 show_mission_box() {
   local title="${1:-Mission}"
   local content="${2:-}"

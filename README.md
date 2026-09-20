@@ -48,6 +48,24 @@ docker run -it --rm catgame
    → 🧩 Section mission → 🔁 Checkpoint → 🏆 Stage complete → next stage
 ```
 
+Every lesson explains its command in plain words, and then shows the shape of
+it, which is the part prose is bad at:
+
+```
+📐  HOW TO WRITE IT
+--------------------------------------------------------------------
+  head [-n NUMBER] FILE
+
+  head system.log                    the first 10 lines
+  head -n 3 notes.txt                the first 3 lines
+
+  CAPITALS = put your own word there   [ ] = can be left out
+--------------------------------------------------------------------
+```
+
+Knowing what `head` is for and knowing what to type are two different things.
+`help head` brings that box back at any prompt, long after the lesson.
+
 **Two rules the whole game is built on:**
 
 1. Every command is taught, then used immediately.
@@ -265,6 +283,7 @@ Learn-Linux-With-Cat/
 │   │   ├── cheat.sh      ⏩ cheatcode stage picker
 │   │   ├── players.sh    👥 Title screen: new, rename, delete
 │   │   ├── hints.sh      💡 3-tier hint system
+│   │   ├── formats.sh    📐 The shape of every command taught
 │   │   ├── history.sh    ↑ Line editing and command recall
 │   │   └── safety.sh     🛡️ Command safety filter
 │   │
@@ -341,6 +360,13 @@ be rejected even if the lesson teaches it. `STAGE_SYNTAX` does the same for
 shell syntax — chaining (`;` `&&` `||`) and command substitution are refused
 until Stage 9 declares them, because until then they are only a way around the
 command allowlist.
+
+A lesson gets its "HOW TO WRITE IT" box from `LESSON_COMMAND`: the shapes are
+kept in one table, `src/engine/formats.sh`, rather than repeated in 129 lesson
+files. A lesson teaching something not in that table writes its own with
+`LESSON_FORMAT`, and a lesson about an idea rather than a command — a
+deadlock, a zombie — has no shape and shows no box. `tests/test_formats.sh`
+fails if a lesson teaches a command with no format written for it.
 
 `STAGE_REVIEW` names checkpoint challenges in `review/`. A challenge looks like
 a lesson without the teaching: `TASK_INSTRUCTION`, three hints, `check_task`,
@@ -430,6 +456,7 @@ save whole rather than half of a new one.
 |---------|-------------|
 | `hint` | Get progressive help (3 levels) |
 | `help` | Show commands you've learned |
+| `help <command>` | How that command is written, with examples |
 | `progress` | Check your current position |
 | `cheatcode` | Jump straight to any stage (see below) |
 | `quit` | Save progress and exit |

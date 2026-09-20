@@ -537,12 +537,29 @@ interactive_prompt() {
                         return 0
                     fi
                     ;;
-                help)
+                help|"help "*)
+                    # `help ls` gives back the shape of ls: the same box the
+                    # lesson showed, for when the shape is the part that has
+                    # gone and the explanation is not what is wanted.
+                    local topic topic_body
+                    topic="${input#help}"
+                    topic="${topic# }"
                     echo ""
-                    local learned
-                    learned="$(get_learned_commands)"
-                    echo "Commands you've learned: ${learned:-(none yet — finish this lesson to earn one!)}"
-                    echo "Game commands: hint, help, progress, cheatcode, quit"
+                    if [[ -n "$topic" ]]; then
+                        topic_body="$(command_format_lines "$topic")"
+                        if [[ -n "$topic_body" ]]; then
+                            show_format_box "$topic_body"
+                        else
+                            echo "I have no format written for '${topic}'."
+                            echo "Type 'help' on its own for the commands you know."
+                        fi
+                    else
+                        local learned
+                        learned="$(get_learned_commands)"
+                        echo "Commands you've learned: ${learned:-(none yet — finish this lesson to earn one!)}"
+                        echo "Game commands: hint, help, progress, cheatcode, quit"
+                        echo "Type 'help <command>' — help ls — to see how one is written."
+                    fi
                     echo ""
                     ;;
                 progress)
@@ -613,6 +630,12 @@ run_lesson() {
     unset -f check_task 2>/dev/null || true
     unset -f setup_lesson 2>/dev/null || true
     LESSON_START_DIR=""
+    # Lessons are sourced into this shell one after another, so anything a
+    # lesson does not set is still whatever the last one left. The format box
+    # is drawn from these two, and showing the previous lesson's command
+    # under this one's explanation would be worse than showing nothing.
+    LESSON_COMMAND=""
+    LESSON_FORMAT=""
 
     # Source the lesson (defines variables + check_task function)
     source "$lesson_script"
@@ -644,6 +667,12 @@ run_lesson() {
     echo ""
     show_cat "${LESSON_CAT_POSE:-default}"
     show_lesson_box "${LESSON_TITLE:-CAT SAYS}" "${LESSON_CONTENT:-}"
+    echo ""
+
+    # And the shape of the command itself. The explanation above says what it
+    # is for; this says where each part goes, which is the half a beginner
+    # cannot guess from prose.
+    show_format_box "$(lesson_format_body)"
     echo ""
 
     # Pause for reading

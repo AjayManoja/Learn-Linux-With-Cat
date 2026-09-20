@@ -16,6 +16,8 @@ source "$GAME_ROOT/src/engine/progress.sh"
 source "$GAME_ROOT/src/engine/history.sh"
 source "$GAME_ROOT/src/engine/players.sh"
 source "$GAME_ROOT/src/engine/hints.sh"
+# The command shapes the lessons show under their explanation.
+source "$GAME_ROOT/src/engine/formats.sh"
 # sandbox.sh first: it decides where the sandbox lives, and safety.sh and
 # checker.sh both resolve their paths against that.
 source "$GAME_ROOT/src/world/sandbox.sh"

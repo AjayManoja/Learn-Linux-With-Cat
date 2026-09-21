@@ -15,9 +15,9 @@ body="$(command_format_lines "head")"
 assert_eq "the shape comes first, with the parts to fill in capitalised" \
     "head [-n NUMBER] FILE" "$(sed -n '1p' <<< "$body" | sed 's/^ *//')"
 assert_ok "and a worked example follows it" \
-    grep -q 'head -n 3 notes.txt' <<< "$body"
+    grep -q 'head -n 5 diary.txt' <<< "$body"
 assert_ok "with what that example does, in plain words" \
-    grep -q 'the first 3 lines' <<< "$body"
+    grep -q 'the first 5 lines' <<< "$body"
 
 # A lesson about an idea has no command to write out, and gets no box.
 assert_eq "a lesson about a concept has no format" "" "$(command_format_lines "deadlock")"
@@ -90,15 +90,81 @@ assert_ok "and there are as many of them as there are lessons" \
 rendered="$(show_format_box "$(command_format_lines "ls -la")")"
 assert_ok "the box is titled so a beginner knows what it is for" \
     grep -q 'HOW TO WRITE IT' <<< "$rendered"
-assert_ok "and explains its own notation" \
-    grep -q 'CAPITALS' <<< "$rendered"
-
-# A shape with nothing to fill in explains nothing: "pwd" is the whole of it.
-rendered="$(show_format_box "$(command_format_lines "pwd")")"
-assert_fails "a command with no parts to fill in skips the notation line" \
-    grep -q 'CAPITALS' <<< "$rendered"
-
+assert_ok "and holds the shape of the command" \
+    grep -q 'ls -la \[FOLDER\]' <<< "$rendered"
 assert_eq "no format means no box at all" "" "$(show_format_box "")"
+
+# ── An example never hands over the answer ───────────
+# The box shows the shape of a command; the task underneath it asks the
+# player to use that command on their own files. An example that works on
+# the same file the task names is not an example, it is the answer, and a
+# player who copies it has been taught nothing. So: no example may reuse a
+# word from its own lesson's task or hints.
+
+strip_colour() { sed 's/\[[0-9;]*m//g'; }
+
+# The shape is everything before the blank line, the examples everything
+# after it. The example sits in the first 34 columns of its line.
+format_part() {
+    local key="$1" want="$2" seen_gap=false line text
+    while IFS= read -r line; do
+        if [[ -z "${line// /}" ]]; then seen_gap=true; continue; fi
+        if [[ "$want" == "shape" ]]; then
+            $seen_gap && continue
+            printf '%s
+' "$line"
+            continue
+        fi
+        $seen_gap || continue
+        text="${line:2:34}"
+        text="${text%"${text##*[![:space:]]}"}"
+        [[ -n "$text" ]] && printf '%s
+' "$text"
+    done < <(command_format_lines "$key" | strip_colour)
+}
+
+unfair=""
+checked=0
+while IFS= read -r lesson; do
+    key="$(
+        line="$(grep -m1 '^LESSON_COMMAND=' "$lesson")" || true
+        eval "$line" 2>/dev/null
+        printf '%s' "${LESSON_COMMAND:-}"
+    )"
+    [[ -n "$key" ]] || continue
+
+    # What the lesson asks for, and every hint it gives towards it.
+    task="$(grep -E '^(TASK_INSTRUCTION|HINT_1|HINT_2|HINT_3)=' "$lesson" | tr -s '[:space:]' ' ')"
+    shape="$(format_part "$key" shape)"
+
+    while IFS= read -r example; do
+        [[ -n "$example" ]] || continue
+        first="${example%% *}"
+        for token in $example; do
+            # The command being taught and its own syntax are not giveaways:
+            # they are what the lesson is about, and they are in the shape
+            # line above. Only the arguments can hand over the answer.
+            [[ "$token" == "$first" ]] && continue
+            [[ "$token" == -* ]] && continue
+            [[ "$token" == '$'* ]] && continue
+            [[ "${#token}" -ge 3 ]] || continue
+            [[ "$token" =~ [A-Za-z] ]] || continue
+            case "$token" in do|then|done|fi|in) continue ;; esac
+
+            token="$(printf '%s' "$token" | tr -d "\"'")"
+            grep -qF -- "$token" <<< "$shape" && continue
+
+            if grep -qF -- "$token" <<< "$task"; then
+                unfair="${unfair}
+  ${key}: '${example}' reuses '${token}' from the task"
+            fi
+        done
+        checked=$((checked + 1))
+    done < <(format_part "$key" example)
+done < <(find "$REPO_ROOT/stages" -path '*/lessons/*.sh' | sort)
+
+assert_eq "no example reuses anything the lesson's own task asks for" "" "$unfair"
+assert_ok "and there were plenty of examples to check" test "$checked" -ge 100
 
 # ── A lesson can write its own ─────────────────────────────
 

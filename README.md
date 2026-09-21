@@ -56,13 +56,13 @@ it, which is the part prose is bad at:
 --------------------------------------------------------------------
   head [-n NUMBER] FILE
 
-  head system.log                    the first 10 lines
-  head -n 3 notes.txt                the first 3 lines
-
-  CAPITALS = put your own word there   [ ] = can be left out
+  head app.log                       the first 10 lines
+  head -n 5 diary.txt                the first 5 lines
 --------------------------------------------------------------------
 ```
 
+The examples never use the files the task asks for, so the box shows the
+shape without handing over the answer; `tests/test_formats.sh` enforces that.
 Knowing what `head` is for and knowing what to type are two different things.
 `help head` brings that box back at any prompt, long after the lesson.
 
